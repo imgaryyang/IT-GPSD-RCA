@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<persistence version="2.0" xmlns="http://java.sun.com/xml/ns/persistence" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://java.sun.com/xml/ns/persistence http://java.sun.com/xml/ns/persistence/persistence_2_0.xsd">
+	   <persistence-unit name="GPSRCA" transaction-type="RESOURCE_LOCAL">
+	
+	  	<provider>org.hibernate.ejb.HibernatePersistence</provider>
+<!-- 	  How 2nd level chache is used.
+			ALL, NONE, DISABLE_SELECTIVE, ENABLE_SELECTIVE, NOT_SPECIFIED -->
+ 		<shared-cache-mode>ALL</shared-cache-mode>
+ <properties>
+  <property name="hibernate.dialect" value="org.hibernate.dialect.DB2Dialect" />
+
+				<property name="hibernate.query.substitutions" value="true 'T', false 'F'"	 />
+				<property name="hibernate.show_sql" value="true" />
+				<property name="hibernate.c3p0.minPoolSize" value="5" />
+				<property name="hibernate.c3p0.maxPoolSize" value="30" />
+				<property name="hibernate.c3p0.timeout" value="300" />
+				<property name="hibernate.c3p0.max_statement" value="100" />
+				<property name="hibernate.c3p0.testConnectionOnCheckout" value="false"			 />
+				
+				<property name="current_session_context_class" value="org.springframework.orm.hibernate4.SpringSessionContext" />
+			    <property name="hibernate.connection.driver_class" value="com.ibm.db2.jcc.DB2Driver" />
+			    <property name="hibernate.connection.autocommit" value="true"/>
+			    <property name="hibernate.connection.release_mode" value="on_close"/>
+			    <property name="hibernate.connection.characterEncoding" value="UTF-8"/>
+			    <property name="hibernate.default_schema" value="GPSRCA" />
+			  
+        </properties>
+
+	</persistence-unit>
+	
+</persistence>
+

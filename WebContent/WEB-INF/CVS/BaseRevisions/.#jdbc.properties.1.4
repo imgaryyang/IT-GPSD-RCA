@@ -1,0 +1,26 @@
+# Properties file with JDBC-related settings.
+# Applied by PropertyPlaceholderConfigurer from "dataAccessContext-local.xml".
+# Targeted at system administrators, to avoid touching the context XML files. ISCRCA
+
+###################### UAT ###################
+#jdbc.driverClassName=com.ibm.db2.jcc.DB2Driver
+#jdbc.url=jdbc\:db2\://mopbz171055.pssc.mop.fr.ibm.com\:50000/gpsrcaut
+#jdbc.password=passw0rd
+#jdbc.username=db2inst1
+
+
+############### PRODUCTION #########
+
+jdbc.driverClassName=com.ibm.db2.jcc.DB2Driver
+jdbc.url=jdbc:db2://prdpcrwgpsd01.w3-969.ibm.com:50000/gpsrca
+jdbc.password=passw0rd
+jdbc.username=db2inst1
+
+hibernate.dialect=org.hibernate.dialect.DB2Dialect
+database=db2
+
+
+
+
+################## uncomment following 2 lines for mysql #############
+usedTransaction=true

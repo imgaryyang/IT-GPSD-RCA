@@ -1,0 +1,395 @@
+package com.gps.service.impl;
+
+import com.gps.dao.EmailReminderDao;
+import com.gps.dao.EmailTemplateDao;
+import com.gps.dao.RcaActionDao;
+import com.gps.dao.RcaDao;
+import com.gps.service.EmailReminderService;
+import com.gps.util.CommonUtil;
+import com.gps.util.ConstantDataManager;
+import com.gps.util.GPSMailer;
+import com.gps.util.StringUtils;
+import com.gps.vo.EmailReminder;
+import com.gps.vo.EmailTemplate;
+import com.gps.vo.Rca;
+import com.gps.vo.RcaAction;
+import org.apache.commons.collections.CollectionUtils;
+import org.apache.log4j.Logger;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
+import java.util.*;
+
+/**
+ * Created by Waqar Malik on 29-05-2015.
+ */
+@Service
+public class EmailReminderServiceImpl implements EmailReminderService {
+    private static final Logger logger = Logger.getLogger(EmailReminderServiceImpl.class);
+
+    @Autowired
+    EmailReminderDao emailReminderDao;
+
+    @Autowired
+    EmailTemplateDao emailTemplateDao;
+
+    @Autowired
+    RcaDao rcaDao;
+
+    @Autowired
+    GPSMailer gpsMailer;
+
+    @Autowired
+    RcaActionDao rcaActionDao;
+
+    @Override
+    public void sendRcaNotClosedEmailReminders() {
+        Date todayDate = new Date();
+        if (CommonUtil.isWorkingDay(todayDate)) {
+            try {
+                logger.debug("started sendRcaNotClosedEmailReminders()...");
+                EmailTemplate emailTemplate = emailTemplateDao.getEmailTemplateByName("RCA_NOT_CLOSED_REMINDER");
+                List<EmailReminder> emailReminders = emailReminderDao.findByReminderType(ConstantDataManager.RCA_NOT_CLOSED_REMINDER);
+                if (CollectionUtils.isNotEmpty(emailReminders) && emailTemplate != null) {
+                    for (EmailReminder emailReminder : emailReminders) {
+                        if (todayDate.compareTo(emailReminder.getStartDate()) >= 0 && todayDate.compareTo(emailReminder.getEndDate()) <= 0
+                                && emailReminder.getIsEnabled().equalsIgnoreCase(ConstantDataManager.YES)) {
+                            Rca rca = rcaDao.getRcaById(Integer.parseInt(emailReminder.getQuestionnaireId()));
+                            if (rca != null) {
+                                Hashtable<String, String> keys = CommonUtil.getValueMap(rca);
+                                if (emailTemplate != null) {
+                                    try {
+                                        String to = emailReminder.getToEmail();
+                                        String body = StringUtils.replaceAll(emailTemplate.getBody(), keys);
+                                        String subject = StringUtils.replaceAll(emailTemplate.getSubject(), keys);
+                                        String cc = emailReminder.getCcEmail();
+                                        List<String> recipients = new ArrayList<String>();
+                                        if (StringUtils.isNotBlank(to)) {
+                                            recipients = Arrays.asList(to.split(","));
+                                        }
+                                        List<String> ccList = new ArrayList<String>();
+                                        if (StringUtils.isNotBlank(cc)) {
+                                            ccList = Arrays.asList(cc.split(","));
+                                        }
+                                        // adding application owner details if required
+                                        addApplicationOwner(emailReminder, ccList);
+
+                                        logger.debug("To: " + to);
+                                        logger.debug("CC: " + cc);
+                                        logger.debug("Subject: " + subject);
+                                        logger.debug("Email: " + body);
+                                        gpsMailer.sendEmail(emailTemplate.getFromAlias(), subject, body, recipients, ccList);
+
+                                        // save the Email Reminder state
+                                        saveNumOfTimesSentInfo(emailReminder);
+
+                                    } catch (Exception e) {
+                                        logger.error(e.getMessage(), e);
+                                    }
+                                    // delete reminder if it is last day of it
+                                    deleteEmailReminder(todayDate, emailReminder);
+                                }
+                            }
+                        }
+                    }
+                }
+            } catch (Exception e) {
+                logger.error(e.getMessage(), e);
+            }
+        } else {
+            logger.debug("aborting RCA Not Closed Job, Today is not working today ...");
+        }
+        logger.debug("finished sendRcaNotClosedEmailReminders()...");
+    }
+
+    private void saveNumOfTimesSentInfo(EmailReminder emailReminder) {
+        EmailReminder dbEmailReminder = emailReminderDao.findById(emailReminder.getEmailReminderId());
+        if (dbEmailReminder != null) {
+            Integer numOfTimesSent = dbEmailReminder.getNumberOfTimesSent();
+            if (numOfTimesSent == null || numOfTimesSent == 0) {
+                numOfTimesSent = 1;
+            } else {
+                numOfTimesSent = numOfTimesSent + 1;
+            }
+            dbEmailReminder.setNumberOfTimesSent(numOfTimesSent);
+            emailReminderDao.updateEmailReminder(dbEmailReminder);
+        }
+    }
+
+    private void addApplicationOwner(EmailReminder emailReminder, List<String> ccList) {
+        ArrayList ccArrayList = new ArrayList(ccList);
+        if (emailReminder != null) {
+            Integer numOfTimesSent = emailReminder.getNumberOfTimesSent();
+            if (numOfTimesSent != null && numOfTimesSent >= 2) {
+                ccArrayList.add(ConstantDataManager.APPLICATION_OWNER);
+            }
+        }
+        if(CollectionUtils.isNotEmpty(ccArrayList)){
+            ccList = ccArrayList;
+        }
+    }
+
+    @Override
+    public void sendRcaNotApprovedReminders() {
+        Date todayDate = new Date();
+        if (CommonUtil.isWorkingDay(todayDate)) {
+            try {
+                logger.debug("started sendRcaNotApprovedReminders()...");
+                EmailTemplate emailTemplate = emailTemplateDao.getEmailTemplateByName("RCA_NOT_APPROVED_REMINDER");
+                List<EmailReminder> emailReminders = emailReminderDao.findByReminderType(ConstantDataManager.RCA_NOT_APPROVED_REMINDER);
+                if (CollectionUtils.isNotEmpty(emailReminders) && emailTemplate != null) {
+                    for (EmailReminder emailReminder : emailReminders) {
+                        if (todayDate.compareTo(emailReminder.getStartDate()) >= 0 && todayDate.compareTo(emailReminder.getEndDate()) <= 0
+                                && emailReminder.getIsEnabled().equalsIgnoreCase(ConstantDataManager.YES)) {
+                            Rca rca = rcaDao.getRcaById(Integer.parseInt(emailReminder.getQuestionnaireId()));
+                            if (rca != null) {
+                                Hashtable<String, String> keys = CommonUtil.getValueMap(rca);
+                                if (emailTemplate != null) {
+                                    try {
+                                        String to = emailReminder.getToEmail();
+                                        String body = StringUtils.replaceAll(emailTemplate.getBody(), keys);
+                                        String subject = StringUtils.replaceAll(emailTemplate.getSubject(), keys);
+                                        String cc = emailReminder.getCcEmail();
+
+                                        List<String> recipients = new ArrayList<String>();
+                                        if (StringUtils.isNotBlank(to)) {
+                                            recipients = Arrays.asList(to.split(","));
+                                        }
+                                        List<String> ccList = new ArrayList<String>();
+                                        if (StringUtils.isNotBlank(cc)) {
+                                            ccList = Arrays.asList(cc.split(","));
+                                        }
+                                        // adding application owner details if required
+                                        addApplicationOwner(emailReminder, ccList);
+
+                                        logger.debug("To: " + to);
+                                        logger.debug("CC: " + cc);
+                                        logger.debug("Subject: " + subject);
+                                        logger.debug("Email: " + body);
+                                        gpsMailer.sendEmail(emailTemplate.getFromAlias(), subject, body, recipients, ccList);
+
+                                        // save the Email Reminder state
+                                        saveNumOfTimesSentInfo(emailReminder);
+
+                                    } catch (Exception e) {
+                                        logger.error(e.getMessage(), e);
+                                    }
+                                    // delete reminder if it is last day of it
+                                    deleteEmailReminder(todayDate, emailReminder);
+                                }
+                            }
+                        }
+                    }
+                }
+            } catch (Exception e) {
+                logger.error(e.getMessage(), e);
+            }
+        } else {
+            logger.debug("aborting RCA Not Approved Job, Today is not working today ...");
+        }
+        logger.debug("finished sendRcaNotApprovedReminders()...");
+
+    }
+
+    @Override
+    public void sendRcaNotAcceptedByOwnerReminders() {
+        Date todayDate = new Date();
+        if (CommonUtil.isWorkingDay(todayDate)) {
+            try {
+                logger.debug("started sendRcaNotAcceptedByOwnerReminders()...");
+                EmailTemplate emailTemplate = emailTemplateDao.getEmailTemplateByName("RCA_NOT_ACCEPTED_BY_OWNER_REMINDER");
+                List<EmailReminder> emailReminders = emailReminderDao.findByReminderType(ConstantDataManager.RCA_NOT_ACCEPTED_BY_OWNER_REMINDER);
+                if (CollectionUtils.isNotEmpty(emailReminders) && emailTemplate != null) {
+                    for (EmailReminder emailReminder : emailReminders) {
+                        if (todayDate.compareTo(emailReminder.getStartDate()) >= 0 && emailReminder.getIsEnabled().equalsIgnoreCase(ConstantDataManager.YES)) {
+                            Rca rca = rcaDao.getRcaById(Integer.parseInt(emailReminder.getQuestionnaireId()));
+                            if (rca != null) {
+                                Hashtable<String, String> keys = CommonUtil.getValueMap(rca);
+                                if (emailTemplate != null) {
+                                    try {
+                                        String to = emailReminder.getToEmail();
+                                        String body = StringUtils.replaceAll(emailTemplate.getBody(), keys);
+                                        String subject = StringUtils.replaceAll(emailTemplate.getSubject(), keys);
+                                        String cc = emailReminder.getCcEmail();
+                                        List<String> recipients = new ArrayList<String>();
+                                        if (StringUtils.isNotBlank(to)) {
+                                            recipients = Arrays.asList(to.split(","));
+                                        }
+                                        List<String> ccList = new ArrayList<String>();
+                                        if (StringUtils.isNotBlank(cc)) {
+                                            ccList = Arrays.asList(cc.split(","));
+                                        }
+
+                                        // adding application owner details if required
+                                        addApplicationOwner(emailReminder, ccList);
+
+                                        logger.debug("To: " + to);
+                                        logger.debug("CC: " + cc);
+                                        logger.debug("Subject: " + subject);
+                                        logger.debug("Email: " + body);
+                                        gpsMailer.sendEmail(emailTemplate.getFromAlias(), subject, body, recipients, ccList);
+
+                                        // save the Email Reminder state
+                                        saveNumOfTimesSentInfo(emailReminder);
+
+
+                                    } catch (Exception e) {
+                                        logger.error(e.getMessage(), e);
+                                    }
+
+                                    // delete reminder if it is last day of it
+                                    deleteEmailReminder(todayDate, emailReminder);
+
+                                }
+                            }
+                        }
+                    }
+                }
+            } catch (Exception e) {
+                logger.error(e.getMessage(), e);
+            }
+        } else {
+            logger.debug("aborting RCA Not Accepted by Owner Job, Today is not working today ...");
+        }
+        logger.debug("finished sendRcaNotAcceptedByOwnerReminders()...");
+
+    }
+
+    @Override
+    public void sendRcaNotSubmittedByOwnerReminders() {
+        Date todayDate = new Date();
+        if (CommonUtil.isWorkingDay(todayDate)) {
+            try {
+                logger.debug("started sendRcaNotSubmittedByOwnerReminders()...");
+                EmailTemplate emailTemplate = emailTemplateDao.getEmailTemplateByName("RCA_NOT_SUBMITTED_REMINDER");
+                List<EmailReminder> emailReminders = emailReminderDao.findByReminderType(ConstantDataManager.RCA_NOT_SUBMITTED_REMINDER);
+                if (CollectionUtils.isNotEmpty(emailReminders) && emailTemplate != null) {
+                    for (EmailReminder emailReminder : emailReminders) {
+                        if (todayDate.compareTo(emailReminder.getStartDate()) >= 0 && emailReminder.getIsEnabled().equalsIgnoreCase(ConstantDataManager.YES)) {
+                            Rca rca = rcaDao.getRcaById(Integer.parseInt(emailReminder.getQuestionnaireId()));
+                            if (rca != null) {
+                                Hashtable<String, String> keys = CommonUtil.getValueMap(rca);
+                                if (emailTemplate != null) {
+                                    try {
+                                        String to = emailReminder.getToEmail();
+                                        String body = StringUtils.replaceAll(emailTemplate.getBody(), keys);
+                                        String subject = StringUtils.replaceAll(emailTemplate.getSubject(), keys);
+                                        String cc = emailReminder.getCcEmail();
+
+                                        List<String> recipients = new ArrayList<String>();
+                                        if (StringUtils.isNotBlank(to)) {
+                                            recipients = Arrays.asList(to.split(","));
+                                        }
+                                        List<String> ccList = new ArrayList<String>();
+                                        if (StringUtils.isNotBlank(cc)) {
+                                            ccList = Arrays.asList(cc.split(","));
+                                        }
+
+                                        // adding application owner details if required
+                                        addApplicationOwner(emailReminder, ccList);
+
+                                        logger.debug("To: " + to);
+                                        logger.debug("CC: " + cc);
+                                        logger.debug("Subject: " + subject);
+                                        logger.debug("Email: " + body);
+                                        gpsMailer.sendEmail(emailTemplate.getFromAlias(), subject, body, recipients, ccList);
+
+                                        // save the Email Reminder state
+                                        saveNumOfTimesSentInfo(emailReminder);
+
+
+                                    } catch (Exception e) {
+                                        logger.error(e.getMessage(), e);
+                                    }
+
+                                    // delete reminder if it is last day of it
+                                    deleteEmailReminder(todayDate, emailReminder);
+
+                                }
+                            }
+                        }
+                    }
+                }
+            } catch (Exception e) {
+                logger.error(e.getMessage(), e);
+            }
+        } else {
+            logger.debug("aborting RCA Not Submitted by Owner Job, Today is not working today ...");
+        }
+        logger.debug("finished sendRcaNotSubmittedByOwnerReminders()...");
+
+    }
+
+    @Override
+    public void sendActionNotClosedReminders() {
+        Date todayDate = new Date();
+        if (CommonUtil.isWorkingDay(todayDate)) {
+            try {
+                logger.debug("started sendActionNotClosedReminders()...");
+                EmailTemplate emailTemplate = emailTemplateDao.getEmailTemplateByName("ACTION_NOT_CLOSED_REMINDER");
+                List<EmailReminder> emailReminders = emailReminderDao.findByReminderType(ConstantDataManager.ACTION_NOT_CLOSED_REMINDER);
+                if (CollectionUtils.isNotEmpty(emailReminders) && emailTemplate != null) {
+                    for (EmailReminder emailReminder : emailReminders) {
+                        if (todayDate.compareTo(emailReminder.getStartDate()) >= 0 && todayDate.compareTo(emailReminder.getEndDate()) <= 0
+                                && emailReminder.getIsEnabled().equalsIgnoreCase(ConstantDataManager.YES)) {
+                            RcaAction rcaAction = rcaActionDao.getRcaActionById(Integer.parseInt(emailReminder.getQuestionnaireId()));
+                            if (rcaAction != null) {
+                                Hashtable<String, String> keys = CommonUtil.getValueMap(rcaAction);
+                                if (emailTemplate != null) {
+                                    try {
+                                        String to = emailReminder.getToEmail();
+                                        String body = StringUtils.replaceAll(emailTemplate.getBody(), keys);
+                                        String subject = StringUtils.replaceAll(emailTemplate.getSubject(), keys);
+                                        String cc = emailReminder.getCcEmail();
+
+                                        List<String> recipients = new ArrayList<String>();
+                                        if (StringUtils.isNotBlank(to)) {
+                                            recipients = Arrays.asList(to.split(","));
+                                        }
+                                        List<String> ccList = new ArrayList<String>();
+                                        if (StringUtils.isNotBlank(cc)) {
+                                            ccList = Arrays.asList(cc.split(","));
+                                        }
+
+                                        // adding application owner details if required
+                                        addApplicationOwner(emailReminder, ccList);
+
+                                        logger.debug("To: " + to);
+                                        logger.debug("CC: " + cc);
+                                        logger.debug("Subject: " + subject);
+                                        logger.debug("Email: " + body);
+                                        gpsMailer.sendEmail(emailTemplate.getFromAlias(), subject, body, recipients, ccList);
+
+                                        // save the Email Reminder state
+                                        saveNumOfTimesSentInfo(emailReminder);
+
+                                    } catch (Exception e) {
+                                        logger.error(e.getMessage(), e);
+                                    }
+                                    // delete reminder if it is last day of it
+                                    deleteEmailReminder(todayDate, emailReminder);
+                                }
+                            }
+                        }
+                    }
+                }
+            } catch (Exception e) {
+                logger.error(e.getMessage(), e);
+            }
+        } else {
+            logger.debug("aborting Action Not Closed Job, Today is not working today ...");
+        }
+    }
+
+    private void deleteEmailReminder(Date todayDate, EmailReminder emailReminder) {
+        try {
+            if (emailReminder.getEndDate() != null && todayDate.compareTo(emailReminder.getEndDate()) == 0) {
+                emailReminderDao.deleteEmailReminder(emailReminder);
+            }
+        } catch (Exception e) {
+            logger.error(e.getMessage(), e);
+        }
+    }
+
+
+}

@@ -1,0 +1,674 @@
+package com.gps.service.impl;
+
+import com.gps.dao.*;
+import com.gps.service.GpsUserService;
+import com.gps.service.RcaActionService;
+import com.gps.service.RcaService;
+import com.gps.service.ReportService;
+import com.gps.util.BluePages;
+import com.gps.util.CommonUtil;
+import com.gps.util.ConstantDataManager;
+import com.gps.util.StringUtils;
+import com.gps.vo.*;
+import com.gps.vo.helper.*;
+import org.apache.commons.collections.CollectionUtils;
+import org.apache.log4j.Logger;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
+import javax.persistence.criteria.CriteriaBuilder;
+import java.text.SimpleDateFormat;
+import java.util.*;
+
+/**
+ * Created by Waqar Malik on 14-04-2015.
+ */
+
+@Service
+public class ReportServiceImpl implements ReportService {
+
+    @Autowired
+    RcaService rcaService;
+
+    @Autowired
+    RcaCoordinatorDao rcaCoordinatorDao;
+
+    @Autowired
+    GpsDao gpsDao;
+
+    @Autowired
+    RcaDao rcaDao;
+
+    @Autowired
+    ContractContactDao contractContactDao;
+
+    @Autowired
+    GpsUserService gpsUserService;
+
+    @Autowired
+    RcaCauseDao rcaCausesDao;
+
+    @Autowired
+    RcaEditorDao rcaEditorDao;
+
+    @Autowired
+    RcaHistoryLogDao rcaHistoryLogDao;
+
+    @Autowired
+    RcaActionService rcaActionService;
+
+    @Autowired
+    RcaActionDao actionDao;
+
+    @Autowired
+    RcaTicketDao rcaTicketDao;
+
+    @Autowired
+    ServiceDescriptionDao serviceDescriptionDao;
+
+    private static final Logger log = Logger.getLogger(ReportServiceImpl.class);
+    public static final String SEPARATOR = "_";
+
+
+    @Override
+    public List<Rca> getRcaCoordinatorReport(List<RcaListing> dataList) {
+        List<Rca> rcaList = new ArrayList<Rca>();
+        try {
+            if (CollectionUtils.isNotEmpty(dataList)) {
+                for (RcaListing rcaListing : dataList) {
+                    if (rcaListing.getListingType().equalsIgnoreCase("rca")) {
+                        Rca rca = rcaService.getRcaByNumber(rcaListing.getRcaOrActionNumber());
+                        RcaCoordinator priRcaCoordinator = rcaCoordinatorDao.getRcaCoordinatorById(Integer.parseInt(rca.getRcaCoordinatorId()));
+                        rca.setPrimaryRcaCoordinator(priRcaCoordinator);
+                        rcaList.add(rca);
+                    }
+                }
+            }
+        } catch (Exception e) {
+            log.error(e.getMessage(), e);
+        }
+
+        return rcaList;
+    }
+
+    @Override
+    public List<RcaCoordinator> getRcaCoordinatorsByRcaIds(String rcaIds) {
+        return rcaCoordinatorDao.getRcaCoordinatorsByRcaIds(rcaIds);
+    }
+
+    @Override
+    public Page getRcaReportListBySearchFilter(SearchFilter searchFilter, String sessionId) {
+        String questionareType = null;
+        List<Object> queryParameters = new ArrayList<Object>();
+        String query = "FROM Rca r LEFT JOIN r.contract c JOIN c.sessionAcls acl ";
+        String orderBy = " ORDER BY r.rcaId asc";
+        String customQuery = "";
+        StringBuilder whereClause = new StringBuilder();
+        Page page = new Page();
+        List<RcaListing> rcaListings = new ArrayList<RcaListing>();
+        int index = 1;
+
+        if (!StringUtils.isNullOrEmpty(searchFilter.getRcaOrActionNumber())) {
+            String[] tokens = searchFilter.getRcaOrActionNumber().split(ConstantDataManager.SEPARATOR);
+            if (tokens != null && tokens.length > 0) {
+                questionareType = tokens[tokens.length - 1];
+            }
+        }
+        //if rca
+
+        if (questionareType == null || questionareType.equalsIgnoreCase("rca")) {
+
+            if (!isNullOrEmpty(searchFilter.getContract())) {
+                whereClause.append(" and c.title Like :A" + index++);
+                queryParameters.add(searchFilter.getContract() + "%");
+            }
+
+            if (!isNullOrEmpty(searchFilter.getCustomer())) {
+                Customer customer = gpsDao.getCustomerByInac(Integer.parseInt(searchFilter.getCustomer()));
+                if (customer != null) {
+                    whereClause.append(" and c.customer = :A" + index++);
+                    queryParameters.add(customer);
+                }
+            }
+
+            if (searchFilter.getStartDate() != null || searchFilter.getEndDate() != null) {
+                if (searchFilter.getStartDate() != null) {
+                    whereClause.append(" and r.incidentStartTime >= :A" + index++);
+                    queryParameters.add(searchFilter.getStartDate());
+                }
+                if (searchFilter.getEndDate() != null) {
+                    whereClause.append(" and r.incidentEntTime <= :A" + index++);
+                    queryParameters.add(searchFilter.getEndDate());
+                }
+            }
+
+            if (searchFilter.getStartDate() == null && searchFilter.getEndDate() == null) {
+                if (searchFilter.getMonth() != null) {
+                    whereClause.append(" and r.month = :A" + index++);
+                    queryParameters.add(searchFilter.getMonth());
+                }
+
+                if (searchFilter.getYear() != null) {
+                    whereClause.append(" and r.year = :A" + index++);
+                    queryParameters.add(searchFilter.getYear());
+                }
+            }
+
+            if (!StringUtils.isNullOrEmpty(searchFilter.getSelectedRcaNumbers())) {
+            	whereClause.append(" and r.rcaNumber IN (");
+                String[] tokens = searchFilter.getSelectedRcaNumbers().split(ConstantDataManager.SEPARATOR);
+                if (tokens != null && tokens.length > 0) {
+                    String rcaNumber = tokens[0];
+                    whereClause.append(rcaNumber + ") ");
+                }
+            }
+
+            if (!StringUtils.isNullOrEmpty(searchFilter.getRcaCoordinator())) {
+                whereClause.append(" and r.rcaCoordinatorId = :A" + index++);
+                queryParameters.add(searchFilter.getRcaCoordinator());
+
+            }
+
+            if (!StringUtils.isNullOrEmpty(searchFilter.getRcaOwner())) {
+                whereClause.append(" and r.rcaOwner = :A" + index++);
+                queryParameters.add(BluePages.getIntranetIdFromNotesId(searchFilter.getRcaOwner()));
+
+            }
+
+            if (!StringUtils.isNullOrEmpty(searchFilter.getRcaDelegate())) {
+                whereClause.append(" and r.rcaDelegate = :A" + index++);
+                queryParameters.add(BluePages.getIntranetIdFromNotesId(searchFilter.getRcaDelegate()));
+
+            }
+
+            if (!StringUtils.isNullOrEmpty(searchFilter.getStage())) {
+                if (searchFilter.getFormType().equalsIgnoreCase("rca")) {
+                    if (searchFilter.getStage().equalsIgnoreCase("closed")) {
+                        whereClause.append(" and r.rcaStage IN ('Closed', 'ClosedWithOpenActions') ");
+                    } else {
+                        whereClause.append(" and r.rcaStage = :A" + index++);
+                        queryParameters.add(searchFilter.getStage());
+                    }
+                }
+            }
+
+            if (!isNullOrEmpty(sessionId)) {
+                whereClause.append(" and acl.role IN ('reportAdmin', 'admin') and acl.sessionId = :A" + index++);
+                queryParameters.add(sessionId);
+            }
+
+            if (!isNullOrEmpty(whereClause.toString())) {
+                query = query + " WHERE 1=1 " + whereClause.toString();
+            } else {
+
+            }
+
+            log.trace("query: " + query);
+            log.debug("whereClause: {" + whereClause + "}");
+
+            query = query + orderBy;
+            customQuery = "Select r.rcaId, r.rcaNumber, r.rcaOwner, r.rcaDelegate, r.dueDate, r.createDate, r.rcaCoordinatorId, r.rcaDpeId, r.rcaStage, r.contract.title " +
+                    query;
+
+            List<Object[]> rcaList = rcaDao.getRcaListByQueryParameters(customQuery, queryParameters);
+            page.setRowCount((long) rcaList.size());
+            log.debug("number of rows found = " + page.getRowCount());
+            Iterator<Object[]> iter = rcaList.iterator();
+            Object[] resultObject = null;
+            while (iter.hasNext()) {
+                resultObject = iter.next();
+
+                Integer rcaId = (Integer) resultObject[0];
+                Rca rca = rcaDao.getRcaById(rcaId);
+                List<RcaAction> rcaActions = new ArrayList<RcaAction>();
+                if (rca != null) {
+                    rcaActions = rca.getRcaActions();
+                }
+
+                // load rcaListing
+                if (StringUtils.isNullOrEmpty(searchFilter.getFormType()) || searchFilter.getFormType().equalsIgnoreCase("rca")) {
+                    RcaListing rcaListing = buildRcaListing(resultObject, rca);
+                    // adding RCAs
+                    if (StringUtils.isNullOrEmpty(searchFilter.getPrimaryTicket())) {
+                    	log.debug("searchFilter.getPrimaryTicket() 1");
+                        addToList(rcaListings, rcaListing);
+                    } else if (searchFilter.getPrimaryTicket().equalsIgnoreCase(rcaListing.getPrimaryTicket())) {
+                    	addToList(rcaListings, rcaListing);
+                    }
+                }
+
+                // adding RCA Actions
+                if ((StringUtils.isNullOrEmpty(questionareType) || !questionareType.equalsIgnoreCase("rca")) &&
+                        (StringUtils.isNullOrEmpty(searchFilter.getFormType()) || searchFilter.getFormType().equalsIgnoreCase("action"))) {
+                    loadRcaActions(rcaActions, rcaListings, searchFilter);
+                }
+            }
+
+            if(rcaListings.size() > 0){
+            	 page.setRowCount(new Long(rcaListings.size()));
+            }
+        }
+
+        // if action
+
+        if (org.apache.commons.lang.StringUtils.isNotBlank(questionareType) && questionareType.equalsIgnoreCase("action")) {
+
+            index = 1;
+            query = "FROM RcaAction a LEFT JOIN a.rca r LEFT JOIN r.contract ";
+
+            if (!isNullOrEmpty(searchFilter.getContract())) {
+                whereClause.append(" and c.title Like :A" + index++);
+                queryParameters.add(searchFilter.getContract() + "%");
+            }
+
+
+            if (searchFilter.getStartDate() != null || searchFilter.getEndDate() != null) {
+                if (searchFilter.getStartDate() != null) {
+                    whereClause.append(" and r.incidentStartTime >= :A" + index++);
+                    queryParameters.add(searchFilter.getStartDate());
+                }
+                if (searchFilter.getEndDate() != null) {
+                    whereClause.append(" and r.incidentEntTime <= :A" + index++);
+                    queryParameters.add(searchFilter.getEndDate());
+                }
+            }
+
+            if (searchFilter.getStartDate() == null && searchFilter.getEndDate() == null) {
+                if (searchFilter.getMonth() != null) {
+                    whereClause.append(" and r.month = :A" + index++);
+                    queryParameters.add(searchFilter.getMonth());
+                }
+
+                if (searchFilter.getYear() != null) {
+                    whereClause.append(" and r.year = :A" + index++);
+                    queryParameters.add(searchFilter.getYear());
+                }
+            }
+
+            if (!StringUtils.isNullOrEmpty(searchFilter.getRcaOrActionNumber())) {
+                whereClause.append(" and a.actionNumber = :A" + index++);
+                String[] tokens = searchFilter.getRcaOrActionNumber().split(ConstantDataManager.SEPARATOR);
+                if (tokens != null && tokens.length > 0) {
+                    String actionNumber = tokens[0];
+                    queryParameters.add(actionNumber);
+                }
+            }
+
+            if (!StringUtils.isNullOrEmpty(searchFilter.getRcaCoordinator())) {
+                whereClause.append(" and r.rcaCoordinatorId = :A" + index++);
+                queryParameters.add(searchFilter.getRcaCoordinator());
+
+            }
+
+            if (!StringUtils.isNullOrEmpty(searchFilter.getRcaOwner())) {
+                whereClause.append(" and r.rcaOwner = :A" + index++);
+                queryParameters.add(BluePages.getIntranetIdFromNotesId(searchFilter.getRcaOwner()));
+
+            }
+
+            if (!StringUtils.isNullOrEmpty(searchFilter.getRcaDelegate())) {
+                whereClause.append(" and r.rcaDelegate = :A" + index++);
+                queryParameters.add(BluePages.getIntranetIdFromNotesId(searchFilter.getRcaDelegate()));
+
+            }
+
+            if (!StringUtils.isNullOrEmpty(searchFilter.getStage())) {
+                whereClause.append(" and a.actionStatus = :A" + index++);
+                queryParameters.add(searchFilter.getStage());
+
+            }
+
+            if (!isNullOrEmpty(sessionId)) {
+                whereClause.append(" and acl.role IN ('reportAdmin') and acl.sessionId = :A" + index++);
+                queryParameters.add(sessionId);
+            }
+
+
+            if (!isNullOrEmpty(whereClause.toString())) {
+                query = query + " WHERE 1=1 " + whereClause.toString();
+            } else {
+
+            }
+
+            log.trace("query: " + query);
+            log.debug("whereClause: {" + whereClause + "}");
+
+            orderBy = " ORDER BY a.rcaActionId asc";
+            query = query + orderBy;
+
+            customQuery = "Select a.rcaActionId, a.actionNumber, r.rcaOwner, r.rcaDelegate, r.dueDate, r.createDate, r.rcaCoordinatorId, r.rcaDpeId, a.actionStatus, r.contract.title " +
+                    query;
+
+            List<Object[]> actionList = actionDao.getActionListByQueryParameters(customQuery, queryParameters);
+            page.setRowCount((long) actionList.size());
+            log.debug("number of rows found = " + page.getRowCount());
+            Iterator<Object[]> iter = actionList.iterator();
+            Object[] resultObject = null;
+            while (iter.hasNext()) {
+                resultObject = iter.next();
+                RcaListing rcaListing = buildActionListing(resultObject);
+                addToList(rcaListings, rcaListing);
+            }
+        }
+
+        if (searchFilter.getFormType().equalsIgnoreCase(ConstantDataManager.ACTION_FORM_TYPE)) {
+            page.setRowCount((long) rcaListings.size());
+        }
+
+        page.setDataList(rcaListings);
+        return page;
+
+    }
+
+    private void addToList(List<RcaListing> dataList, RcaListing rcaValue){
+    	log.debug("addToList()....");
+    	if(dataList == null || rcaValue == null){
+    		return;
+    	}
+    	boolean exist = Boolean.FALSE;
+    	for(RcaListing existing : dataList){
+    		if(existing.getRcaId().equals(rcaValue.getRcaId()) ){
+    			log.debug("existing => "+existing);
+    			log.debug("rcaValue => "+rcaValue);
+    			exist = Boolean.TRUE;
+    		}
+    	}
+    	if(!exist){
+    		dataList.add(rcaValue);
+    	}
+    	log.debug("addToList() End");
+    }
+    @Override
+    public List<Rca> getRcaReportDetails(List<RcaListing> dataList) {
+        List<Rca> rcaList = new ArrayList<Rca>();
+        try {
+            if (CollectionUtils.isNotEmpty(dataList)) {
+                for (RcaListing rcaListing : dataList) {
+                    RcaHelper rcaHelper = new RcaHelper();
+                    if (rcaListing.getListingType().equalsIgnoreCase("rca")) {
+                        Rca rca = rcaService.getRcaByNumber(rcaListing.getRcaOrActionNumber());
+
+
+                        // get the rca created by
+                        GpsUser rcaCreatedBy = gpsUserService.getUserById(rca.getCreatedBy());
+                        if (rcaCreatedBy != null) {
+                            rca.setRcaCreatedBy(rcaCreatedBy);
+                        }
+
+
+                        // get the rca coordinator manager
+                        if (StringUtils.isNotBlank(rca.getRcaCoordinatorId())) {
+                            rcaHelper.setRcaCoordinatorManager(BluePages.getFirstLineMgrNotesId(rca.getRcaCoordinatorId()));
+                        }
+
+                        //get the rca dpe
+                        if (rca.getRcaDpeId() != null) {
+                            GpsUser dpe = gpsUserService.getUserById(rca.getRcaDpeId());
+                            rcaHelper.setRcaDpe(dpe);
+                        }
+
+                        // get the primary Rca Cause
+                        List<RcaCause> rcaCauses = rcaCausesDao.getRcaCausesByRcaIdAndType(rca.getRcaId(), "Y");
+                        if (CollectionUtils.isNotEmpty(rcaCauses)) {
+                            RcaCause primaryRcaCause = rcaCauses.get(0);
+                            try {
+                                ServiceDescription outageCategory = serviceDescriptionDao.getServiceDescriptionById(Integer.parseInt(primaryRcaCause.getOutageCategory()));
+                                primaryRcaCause.setOutageCategory(outageCategory.getServiceDescriptionName());
+                                ServiceDescription outageSubCategory = serviceDescriptionDao.getServiceDescriptionById(Integer.parseInt(primaryRcaCause.getOutageSubCategory()));
+                                primaryRcaCause.setOutageSubCategory(outageSubCategory.getServiceDescriptionName());
+                            } catch (Exception e) {
+                                log.error(e.getMessage(), e);
+                            }
+                            rca.setPrimaryRcaCause(primaryRcaCause);
+                        }
+
+                        // get the contributing Rca Causes
+                        List<RcaCause> rcaContCauses = rcaCausesDao.getRcaCausesByRcaIdAndType(rca.getRcaId(), "N");
+                        if (CollectionUtils.isNotEmpty(rcaContCauses)) {
+
+                            for (RcaCause rcaContCause : rcaContCauses) {
+                                try {
+                                    ServiceDescription outageCategory = serviceDescriptionDao.getServiceDescriptionById(Integer.parseInt(rcaContCause.getOutageCategory()));
+                                    rcaContCause.setOutageCategory(outageCategory.getServiceDescriptionName());
+                                    ServiceDescription outageSubCategory = serviceDescriptionDao.getServiceDescriptionById(Integer.parseInt(rcaContCause.getOutageSubCategory()));
+                                    rcaContCause.setOutageSubCategory(outageSubCategory.getServiceDescriptionName());
+                                } catch (Exception e) {
+                                    log.error(e.getMessage(), e);
+                                }
+                            }
+                            rcaHelper.setContributingCauses(rcaContCauses);
+                        }
+
+                        //get the Rca Editors
+                        List<RcaEditor> rcaEditors = rcaEditorDao.getRcaEditorsByRcaId(rca.getRcaId());
+                        if (CollectionUtils.isNotEmpty(rcaEditors)) {
+                            rca.setRcaEditors(rcaEditors);
+                        } else {
+                            rca.setRcaEditors(new ArrayList<RcaEditor>());
+                        }
+
+                        //get the RCA Approved Date;
+                        Date approvedDate = null;
+                        List<RcaHistoryLog> rcaHistoryLogs = rcaHistoryLogDao.getRcaHistoryLogsByRcaIdAndFormAction(rca.getRcaId(), "Approved");
+                        if (CollectionUtils.isNotEmpty(rcaHistoryLogs)) {
+                            for (RcaHistoryLog historyLog : rcaHistoryLogs) {
+                                if (!rca.getRcaStage().equalsIgnoreCase("Active") && !rca.getRcaStage().equalsIgnoreCase("Awaiting") && !rca.getRcaStage().equalsIgnoreCase("Open")) {
+                                    approvedDate = new Date(historyLog.getSubmittedOn().getTime());
+                                }
+                            }
+                        }
+                        rcaHelper.setApprovedDate(approvedDate);
+
+
+                        // get the incident and service restore duration
+                        if (rca.getIncidentStartTime() != null && rca.getIncidentEntTime() != null) {
+                            rca.setIncidentDuration(CommonUtil.calculateTimestampDifference(rca.getIncidentStartTime(), rca.getIncidentEntTime()));
+                        }
+
+
+                        // get the secondary Problem Record
+                        List<RcaTicket> rcaTickets = rcaTicketDao.getRcaTicketsByRcaId(rca.getRcaId());
+                        if (CollectionUtils.isNotEmpty(rcaTickets)) {
+                            rcaHelper.setSecondaryProblemIncidentRecord(rcaTickets.get(0).getTicketNum());
+                            rcaHelper.setSecondaryAssociatedTool(rcaTickets.get(0).getAssociatedTool());
+                        }
+
+                        rca.setRcaHelper(rcaHelper);
+                        rcaList.add(rca);
+                    }
+                }
+            }
+        } catch (Exception e) {
+            log.error(e.getMessage(), e);
+        }
+
+        return rcaList;
+    }
+
+    @Override
+    public List<RcaAction> getActionSummaryReport(List<RcaListing> dataList) {
+
+        List<RcaAction> actionList = new ArrayList<RcaAction>();
+        try {
+            if (CollectionUtils.isNotEmpty(dataList)) {
+                for (RcaListing rcaListing : dataList) {
+                    RcaActionHelper actionHelper = new RcaActionHelper();
+                    if (rcaListing.getListingType().equalsIgnoreCase("action")) {
+                        RcaAction action = rcaActionService.getRcaActionByActionNumber(rcaListing.getRcaOrActionNumber());
+
+                        // get the rca created by
+                        GpsUser actionCreatedBy = gpsUserService.getUserById(action.getCreatedBy());
+                        if (actionCreatedBy != null) {
+                            actionCreatedBy.setNotesId(BluePages.getNotesIdFromIntranetId(actionCreatedBy.getEmail()));
+                            actionHelper.setActionCreatedBy(actionCreatedBy);
+                        }
+
+                        // get the last updated by
+                        GpsUser actionLastUpdatedBy = gpsUserService.getUserById(action.getUpdatedBy());
+                        if (actionLastUpdatedBy != null) {
+                            actionLastUpdatedBy.setNotesId(BluePages.getNotesIdFromIntranetId(actionLastUpdatedBy.getEmail()));
+                            actionHelper.setActionUpdatedBy(actionLastUpdatedBy);
+                        }
+
+                        //get the resolution description
+                        List<RcaActionHistoryLog> rcaActionHistoryLogs = rcaActionService.getHistoryLogsByActionIdAndFormAction(action.getRcaActionId(), "Closed");
+                        if (CollectionUtils.isNotEmpty(rcaActionHistoryLogs)) {
+                            actionHelper.setResolutionDescription(rcaActionHistoryLogs.get(rcaActionHistoryLogs.size() - 1).getComments());
+                        }
+
+                        action.setRcaActionHelper(actionHelper);
+                        actionList.add(action);
+
+                    }
+                }
+            }
+        } catch (Exception e) {
+            log.error(e.getMessage(), e);
+        }
+
+        return actionList;
+    }
+
+    @Override
+    public Set<Rca> getRcaListByMonthAndYear(int month, int year) {
+        Set<Rca> rcaSet = new HashSet<Rca>();
+        try {
+            rcaSet = rcaDao.getRcaListByMonthAndYearForReports(month, year);
+        } catch (Exception e) {
+            log.error(e.getMessage(), e);
+        }
+        return rcaSet;
+    }
+
+    @Override
+    public List<RcaListing> getRcasAndActionsByMonthAndYear(int month, int year) {
+        List rcaAndActionList = new ArrayList();
+        try {
+            List<Rca> rcaList = new ArrayList<Rca>(rcaDao.getRcaListByMonthAndYearForReports(month, year));
+            if (CollectionUtils.isNotEmpty(rcaList)) {
+                for (Rca rca : rcaList) {
+                    RcaListing rcaListing = new RcaListing();
+                    rcaListing.setRcaOrActionNumber(rca.getRcaNumber());
+                    rcaListing.setNumberAndType(rca.getRcaNumber() + SEPARATOR + "rca");
+                    rcaListing.setListingType("rca");
+                    rcaListing.setPrimaryTicket(rca.getProblemIndidentRecord());
+                    rcaAndActionList.add(rcaListing);
+                    if (CollectionUtils.isNotEmpty(rca.getRcaActions())) {
+                        for (RcaAction rcaAction : rca.getRcaActions()) {
+                            RcaListing rcaActionListing = new RcaListing();
+                            rcaActionListing.setRcaOrActionNumber(rcaAction.getActionNumber());
+                            rcaActionListing.setNumberAndType(rcaAction.getActionNumber() + SEPARATOR + "action");
+                            rcaActionListing.setListingType("action");
+                            rcaAndActionList.add(rcaActionListing);
+                        }
+                    }
+                }
+            }
+        } catch (Exception e) {
+            log.error(e.getMessage(), e);
+        }
+
+        return rcaAndActionList;
+    }
+
+
+    private boolean isNullOrEmpty(String str) {
+        return str == null || str.equals("") ? true : false;
+    }
+
+    private RcaListing buildRcaListing(Object[] resultObject, Rca rca) {
+
+        RcaListing rcaListing = new RcaListing();
+        if (rca != null) {
+            rcaListing.setRcaId(rca.getRcaId());
+            rcaListing.setRcaOrActionNumber((String) resultObject[1]);
+            rcaListing.setRcaOwner((String) resultObject[2]);
+            rcaListing.setRcaDelegate((String) resultObject[3]);
+            rcaListing.setRcaDueDate((resultObject[4] != null ? getFormattedDate((Date) resultObject[4], "dd-MM-yyyy") : ""));
+            rcaListing.setRcaCreateDate((resultObject[5] != null ? getFormattedDate((Date) resultObject[5], "dd-MM-yyyy") : ""));
+            rcaListing.setListingType("rca");
+            String rcaCoordinatorId = ((String) resultObject[6]);
+            if (!StringUtils.isNullOrEmpty(rcaCoordinatorId)) {
+                rcaListing.setRcaCoordinator(rcaCoordinatorId);
+            }
+            Integer rcaDpeId = ((Integer) resultObject[7]);
+            if (rcaDpeId != null && rcaDpeId > 0) {
+                ContractContact rcaDpe = contractContactDao.getContractContactById(rcaDpeId);
+                rcaListing.setRcaDpe(rcaDpe != null ? rcaDpe.getContactName() : "");
+            }
+            rcaListing.setRcaStage((String) resultObject[8]);
+            rcaListing.setRcaAccountTitle((String) resultObject[9]);
+
+            //  load primary ticket
+            // rcaListing.setPrimaryTicket(getPrimaryTicket(rca));
+        }
+
+        return rcaListing;
+    }
+
+    private void loadRcaActions(List<RcaAction> rcaActions, List<RcaListing> rcaListings, SearchFilter searchFilter) {
+
+        if (CollectionUtils.isNotEmpty(rcaActions)) {
+            for (RcaAction rcaAction : rcaActions) {
+                RcaListing rcaActionListing = new RcaListing();
+                rcaActionListing.setRcaOrActionNumber(rcaAction.getActionNumber());
+                rcaActionListing.setRcaAccountTitle(rcaAction.getRca().getContract() != null ? rcaAction.getRca().getContract().getTitle() : "");
+                rcaActionListing.setRcaStage(rcaAction.getActionStatus());
+                rcaActionListing.setRcaOwner(rcaAction.getRca().getRcaOwner());
+                rcaActionListing.setRcaDelegate(rcaAction.getRca().getRcaDelegate());
+                rcaActionListing.setRcaCreateDate((rcaAction.getAssignedOn() != null ? getFormattedDate(rcaAction.getAssignedOn(), "dd-MM-yyyy") : ""));
+                rcaActionListing.setRcaDueDate((rcaAction.getTargetDate() != null ? getFormattedDate(rcaAction.getTargetDate(), "dd-MM-yyyy") : ""));
+                rcaActionListing.setListingType("action");
+                rcaActionListing.setPrimaryTicket(rcaAction.getRca().getProblemIndidentRecord());
+                if (!StringUtils.isNullOrEmpty(rcaAction.getRca().getRcaCoordinatorId())) {
+                    rcaActionListing.setRcaCoordinator(rcaAction.getRca().getRcaCoordinatorId());
+                }
+
+                if ((Integer) rcaAction.getRca().getRcaDpeId() != null && rcaAction.getRca().getRcaDpeId() > 0) {
+                    ContractContact rcaDpe = contractContactDao.getContractContactById(rcaAction.getRca().getRcaDpeId());
+                    rcaActionListing.setRcaDpe(rcaDpe != null ? rcaDpe.getContactName() : "");
+                }
+
+
+                if (org.apache.commons.lang.StringUtils.isBlank(searchFilter.getStage()) || searchFilter.getStage().equalsIgnoreCase(rcaActionListing.getRcaStage())) {
+                    rcaListings.add(rcaActionListing);
+                }
+
+            }
+        }
+    }
+
+    private static String getFormattedDate(Date date, String pattern) {
+        SimpleDateFormat sdf = new SimpleDateFormat(pattern);
+        return sdf.format(date);
+    }
+
+
+    private RcaListing buildActionListing(Object[] resultObject) {
+
+        RcaListing rcaListing = new RcaListing();
+
+
+        rcaListing.setRcaOrActionNumber((String) resultObject[1]);
+        rcaListing.setRcaOwner((String) resultObject[2]);
+        rcaListing.setRcaDelegate((String) resultObject[3]);
+        rcaListing.setRcaDueDate((resultObject[4] != null ? getFormattedDate((Date) resultObject[4], "dd-MM-yyyy") : ""));
+        rcaListing.setRcaCreateDate((resultObject[5] != null ? getFormattedDate((Date) resultObject[5], "dd-MM-yyyy") : ""));
+        rcaListing.setListingType("action");
+        String rcaCoordinatorId = ((String) resultObject[6]);
+        if (!StringUtils.isNullOrEmpty(rcaCoordinatorId)) {
+            RcaCoordinator rcaCoordinator = rcaCoordinatorDao.getRcaCoordinatorById(Integer.parseInt(rcaCoordinatorId));
+            rcaListing.setRcaCoordinator(rcaCoordinator.getCoordinator() != null ? rcaCoordinator.getCoordinator().getCoordinatorName() : "");
+        }
+        Integer rcaDpeId = ((Integer) resultObject[7]);
+        if (rcaDpeId != null && rcaDpeId > 0) {
+            ContractContact rcaDpe = contractContactDao.getContractContactById(rcaDpeId);
+            rcaListing.setRcaDpe(rcaDpe != null ? rcaDpe.getContactName() : "");
+        }
+        rcaListing.setRcaStage((String) resultObject[8]);
+        rcaListing.setRcaAccountTitle((String) resultObject[9]);
+
+
+        return rcaListing;
+    }
+}

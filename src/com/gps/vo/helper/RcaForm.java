@@ -1,0 +1,303 @@
+/**
+ * <pre>
+ * ==========================================================================
+ *
+ * Copyright: (C) IBM Corporation 2013 -- IBM Internal Use Only
+ *
+ * ==========================================================================
+ *
+ *    FILE: ACLForm.java
+ *    CREATOR:Waqar Malik
+ *    DEPT: GBS PAK
+ *    DATE: 17/07/2013
+ *
+ * -PURPOSE-----------------------------------------------------------------
+ *
+ * --------------------------------------------------------------------------
+ *
+ *
+ * -CHANGE LOG--------------------------------------------------------------
+ * 17/07/2013Waqar Malik Initial coding.
+ * ==========================================================================
+ * </pre>
+ */
+package com.gps.vo.helper;
+
+import com.gps.vo.*;
+
+import java.io.Serializable;
+import java.util.ArrayList;
+import java.util.List;
+
+import javax.persistence.Transient;
+
+/**
+ * This class is a helper vo for UI.
+
+ */
+
+public class RcaForm implements Serializable {
+
+    private static final long serialVersionUID = 2651229625501781751L;
+
+    private Rca rca;
+    private RcaCoordinator rcaCoordinator;
+    private List<UserRole> contractEditors;
+    private List<RcaTicket> rcaTickets;
+    private List<RcaCause> rcaContributingCauses;
+    private List<RcaAction> rcaActions;
+    private List<RcaHistoryLog> rcaHistoryLogs;
+    private List<Integer> rcaEditorIds;
+    private List<String> custImpactList;
+    private List<String> customerImpactedList;
+    private String formAction;
+    private GpsUser loggedInUser;
+    private String isRcaOwnerLoggedIn;
+    private String isRcaDelegateLoggedIn;
+    private String loggedInUserRoles;
+    private String accessLevel;
+    private String userRoles;
+    private RcaFormDateHelper rcaFormDateHelper;
+    private RcaFormActionsHelper rcaFormActionsHelper;
+    private String month;
+    private String rcaCoordinatorName;
+    private String rcaCoordinatorManager;
+    private String fileDescription;
+    private List<RcaSupportingFile> supportingFiles;
+    private String isDueDateModificationEnabled = "N";
+    private String isDpeApprovalRequestSent = "N";
+    private String formSavedMessage;
+    private String rcaDueDate;
+    
+    public RcaForm(){
+    	customerImpactedList =  new ArrayList<String>();
+    	custImpactList = new ArrayList<String>();
+    }
+
+    public Rca getRca() {
+        return rca;
+    }
+
+    public void setRca(Rca rca) {
+        this.rca = rca;
+    }
+
+    public RcaCoordinator getRcaCoordinator() {
+        return rcaCoordinator;
+    }
+
+    public void setRcaCoordinator(RcaCoordinator rcaCoordinator) {
+        this.rcaCoordinator = rcaCoordinator;
+    }
+
+    public List<UserRole> getContractEditors() {
+        return contractEditors;
+    }
+
+    public void setContractEditors(List<UserRole> contractEditors) {
+        this.contractEditors = contractEditors;
+    }
+
+    public List<RcaTicket> getRcaTickets() {
+        return rcaTickets;
+    }
+
+    public void setRcaTickets(List<RcaTicket> rcaTickets) {
+        this.rcaTickets = rcaTickets;
+    }
+
+    public List<RcaCause> getRcaContributingCauses() {
+        return rcaContributingCauses;
+    }
+
+    public void setRcaContributingCauses(List<RcaCause> rcaContributingCauses) {
+        this.rcaContributingCauses = rcaContributingCauses;
+    }
+
+    public List<RcaAction> getRcaActions() {
+        return rcaActions;
+    }
+
+    public void setRcaActions(List<RcaAction> rcaActions) {
+        this.rcaActions = rcaActions;
+    }
+
+    public List<RcaHistoryLog> getRcaHistoryLogs() {
+        return rcaHistoryLogs;
+    }
+
+    public void setRcaHistoryLogs(List<RcaHistoryLog> rcaHistoryLogs) {
+        this.rcaHistoryLogs = rcaHistoryLogs;
+    }
+
+    public String getFormAction() {
+        return formAction;
+    }
+
+    public void setFormAction(String formAction) {
+        this.formAction = formAction;
+    }
+
+    public GpsUser getLoggedInUser() {
+        return loggedInUser;
+    }
+
+    public void setLoggedInUser(GpsUser loggedInUser) {
+        this.loggedInUser = loggedInUser;
+    }
+
+    public String getIsRcaOwnerLoggedIn() {
+        return isRcaOwnerLoggedIn;
+    }
+
+    public void setRcaOwnerLoggedIn(String isRcaOwnerLoggedIn) {
+        this.isRcaOwnerLoggedIn = isRcaOwnerLoggedIn;
+    }
+
+    public String getIsRcaDelegateLoggedIn() {
+        return isRcaDelegateLoggedIn;
+    }
+
+    public void setRcaDelegateLoggedIn(String isRcaDelegateLoggedIn) {
+        this.isRcaDelegateLoggedIn = isRcaDelegateLoggedIn;
+    }
+
+    public RcaFormDateHelper getRcaFormDateHelper() {
+        return rcaFormDateHelper;
+    }
+
+    public void setRcaFormDateHelper(RcaFormDateHelper rcaFormDateHelper) {
+        this.rcaFormDateHelper = rcaFormDateHelper;
+    }
+
+    @Transient
+	public List<String> getCustImpactList() {
+		return custImpactList;
+	}
+
+	public void setCustImpactList(List<String> custImpactList) {
+		this.custImpactList = custImpactList;
+	}
+	
+    public List<Integer> getRcaEditorIds() {
+        return rcaEditorIds;
+    }
+
+    public void setRcaEditorIds(List<Integer> rcaEditorIds) {
+        this.rcaEditorIds = rcaEditorIds;
+    }
+
+    public String getLoggedInUserRoles() {
+        return loggedInUserRoles;
+    }
+
+    public void setLoggedInUserRoles(String loggedInUserRoles) {
+        this.loggedInUserRoles = loggedInUserRoles;
+    }
+
+    public RcaFormActionsHelper getRcaFormActionsHelper() {
+        return rcaFormActionsHelper;
+    }
+
+    public void setRcaFormActionsHelper(RcaFormActionsHelper rcaFormActionsHelper) {
+        this.rcaFormActionsHelper = rcaFormActionsHelper;
+    }
+
+    public String getAccessLevel() {
+        return accessLevel;
+    }
+
+    public void setAccessLevel(String accessLevel) {
+        this.accessLevel = accessLevel;
+    }
+
+    public String getUserRoles() {
+        return userRoles;
+    }
+
+    public void setUserRoles(String userRoles) {
+        this.userRoles = userRoles;
+    }
+
+    public String getMonth() {
+        return month;
+    }
+
+    public void setMonth(String month) {
+        this.month = month;
+    }
+
+    public String getRcaCoordinatorName() {
+        return rcaCoordinatorName;
+    }
+
+    public void setRcaCoordinatorName(String rcaCoordinatorName) {
+        this.rcaCoordinatorName = rcaCoordinatorName;
+    }
+
+    public String getRcaCoordinatorManager() {
+        return rcaCoordinatorManager;
+    }
+
+    public void setRcaCoordinatorManager(String rcaCoordinatorManager) {
+        this.rcaCoordinatorManager = rcaCoordinatorManager;
+    }
+
+    public String getFileDescription() {
+        return fileDescription;
+    }
+
+    public void setFileDescription(String fileDescription) {
+        this.fileDescription = fileDescription;
+    }
+
+    public List<RcaSupportingFile> getSupportingFiles() {
+        return supportingFiles;
+    }
+
+    public void setSupportingFiles(List<RcaSupportingFile> supportingFiles) {
+        this.supportingFiles = supportingFiles;
+    }
+
+    public String getIsDueDateModificationEnabled() {
+        return isDueDateModificationEnabled;
+    }
+
+    public void setIsDueDateModificationEnabled(String isDueDateModificationEnabled) {
+        this.isDueDateModificationEnabled = isDueDateModificationEnabled;
+    }
+
+    public String getIsDpeApprovalRequestSent() {
+        return isDpeApprovalRequestSent;
+    }
+
+    public void setIsDpeApprovalRequestSent(String isDpeApprovalRequestSent) {
+        this.isDpeApprovalRequestSent = isDpeApprovalRequestSent;
+    }
+
+    public String getFormSavedMessage() {
+        return formSavedMessage;
+    }
+
+    public void setFormSavedMessage(String formSavedMessage) {
+        this.formSavedMessage = formSavedMessage;
+    }
+
+    public String getRcaDueDate() {
+        return rcaDueDate;
+    }
+
+    public void setRcaDueDate(String rcaDueDate) {
+        this.rcaDueDate = rcaDueDate;
+    }
+
+	public List<String> getCustomerImpactedList() {
+		return customerImpactedList;
+	}
+
+	public void setCustomerImpactedList(List<String> customerImpactedList) {
+		this.customerImpactedList = customerImpactedList;
+	}
+
+	
+}

@@ -1,0 +1,557 @@
+package com.gps.dao.impl;
+
+import com.gps.dao.ContractDao;
+import com.gps.exceptions.GPSException;
+import com.gps.vo.Contract;
+import com.gps.vo.helper.Pagination;
+import com.gps.vo.helper.SearchFilter;
+import org.apache.log4j.Logger;
+import org.springframework.stereotype.Repository;
+
+import javax.persistence.*;
+import java.util.List;
+
+@Repository
+public class ContractDaoImpl implements ContractDao {
+	private static final Logger log = Logger.getLogger(ContractDaoImpl.class);
+	
+	@PersistenceContext
+	private EntityManager entityManager;
+
+	@Override
+	public void addContract(Contract contract) {		
+		entityManager.persist(contract);
+	}
+
+	@SuppressWarnings("unchecked")
+	@Override
+	public List<Contract> getContractsByTitle(SearchFilter searchFilter) {
+		Query query = entityManager.createQuery("SELECT c FROM Contract c LEFT JOIN FETCH c.customer cust WHERE c.isDeleted = 'N' AND UPPER(c.title) LIKE :keyword ORDER BY c.title");
+		query.setParameter("keyword", "%"+searchFilter.getContract().toUpperCase()+"%");
+		query.setMaxResults(25);
+		return	query.getResultList();
+	}
+
+	@SuppressWarnings("unchecked")
+	@Override
+	public List<Contract> getAllContracts() {
+		return entityManager.createQuery("from Contract c where c.isDeleted = 'N' ORDER BY c.title asc").getResultList();
+	}
+	
+	@Override
+	public List<Contract> getAllContracts(String sessionId) {
+		StringBuilder builder = new StringBuilder();
+		builder.append("SELECT c FROM Contract c LEFT JOIN c.sessionAcls acl ");
+		builder.append(" where acl.formType in ('profile','Profile') and acl.sessionId = :sessionId ");
+		builder.append(" ORDER BY c.title asc ");
+		List<Contract> contracts = null;
+		try {
+			Query query = entityManager.createQuery(builder.toString());
+			query.setParameter("sessionId", sessionId);
+			contracts = (List<Contract>)query.getResultList();
+		}
+		catch(Exception e){
+			throw new GPSException(e.getMessage(), e);
+		}
+		return contracts;
+	}
+
+	
+	@Override
+	public void removeContract(Contract contract) {
+		//Query query = entityManager.createQuery("DELETE FROM Contract WHERE contractId=:keyword");
+		entityManager.remove(contract);
+//		query.setParameter("keyword", contract.getContractId());
+//		query.executeUpdate();
+	}
+	
+	@Override
+	public void updateContract(Contract contract) {
+        try {
+            entityManager.merge(contract);
+        }
+        catch(Exception e){
+            throw new GPSException(e.getMessage(), e);
+        }
+	}
+	
+	
+	@Override
+	public Contract getContractByIdAndTitle(Integer contractId) {
+        StringBuilder builder = new StringBuilder();
+        Contract contract = null;
+        try {
+            builder.append("SELECT c FROM Contract c LEFT JOIN FETCH c.customer cust ");
+            builder.append("LEFT JOIN FETCH c.contractContacts cc ");
+       //     builder.append("LEFT JOIN FETCH c.rcaCoordinator rca ");
+            builder.append("LEFT JOIN FETCH c.rcaCoordinators rcas ");
+            builder.append("WHERE c.contractId=:Id ");
+            Query query = entityManager.createQuery(builder.toString());
+            query.setHint("javax.persistence.cache.storeMode", CacheStoreMode.REFRESH);
+            query.setParameter("Id", contractId);
+            contract = (Contract) query.getSingleResult();
+        } catch (Exception e) {
+            throw new GPSException(e.getMessage(), e);
+        }
+        return contract;
+    }
+
+    @Override
+    public Contract getContractByTitle(String title) throws GPSException {
+        StringBuilder builder = new StringBuilder();
+        builder.append("SELECT c FROM Contract c LEFT JOIN FETCH c.customer cust ");
+        builder.append(" WHERE c.title = :title ");
+        Contract contract = null;
+        try {
+            Query query = entityManager.createQuery(builder.toString());
+            query.setHint("javax.persistence.cache.storeMode", CacheStoreMode.REFRESH);
+            query.setParameter("title", title);
+            contract = (Contract) query.getSingleResult();
+        } catch (Exception e) {
+            throw new GPSException(e.getMessage(), e);
+        }
+        return contract;
+    }
+
+    @Override
+	public Contract getSLASLOReportByContractId(Integer contractId, Integer month, Integer year) throws GPSException {
+		StringBuilder builder = new StringBuilder();
+		builder.append("SELECT c FROM Contract c LEFT JOIN FETCH c.customer cust LEFT JOIN FETCH c.industrySect isect LEFT JOIN FETCH c.tower t ");
+		builder.append("LEFT JOIN FETCH c.contractProcesses conP LEFT JOIN FETCH c.country ");
+		builder.append("LEFT JOIN FETCH c.country cont LEFT JOIN FETCH c.contractBcrs LEFT JOIN FETCH c.contractContacts LEFT JOIN FETCH c.contractCssts ");
+		builder.append("LEFT JOIN FETCH c.contractDeliveryCenters cdc LEFT JOIN FETCH cdc.deliveryCenter ");
+		builder.append(" LEFT JOIN FETCH c.imtCountries LEFT JOIN FETCH c.monthlyStatuses ms " );
+		
+		builder.append(" LEFT JOIN FETCH ms.monthlyBusinessControls mbc LEFT JOIN FETCH ms.monthlyCustomerSatisfactions mcs  " );
+		builder.append(" LEFT JOIN FETCH ms.monthlyFinancialPerformances mfp LEFT JOIN FETCH ms.monthlyOperationalMeasures mom " );
+//		builder.append(" LEFT JOIN FETCH mom.omSlas omsla LEFT JOIN FETCH mom.omSlos omslo " );
+//		builder.append(" LEFT JOIN FETCH omsla.sla sla LEFT JOIN FETCH omslo.slo slo " );
+		
+		builder.append(" WHERE c.contractId in (:contract)");
+		builder.append(" and ms.month = :month and ms.year = :year ");
+		Contract contract = null;
+		try {
+			Query query = entityManager.createQuery(builder.toString());
+			query.setHint("javax.persistence.cache.storeMode", CacheStoreMode.REFRESH);
+			query.setParameter("contract", contractId);
+			query.setParameter("month", month);
+			query.setParameter("year", year);
+			contract = (Contract) query.getSingleResult();
+		}
+		catch(Exception e){
+			throw new GPSException(e.getMessage(), e);
+		}
+		return contract;
+	}
+	
+	@Override
+	public Contract getFaScmSLAReportByContract(Integer contractId, Integer month, Integer year) throws GPSException {
+		StringBuilder builder = new StringBuilder();
+		builder.append("SELECT c FROM Contract c LEFT JOIN FETCH c.customer cust LEFT JOIN FETCH c.industrySect isect LEFT JOIN FETCH c.tower t ");
+		builder.append("LEFT JOIN FETCH c.contractProcesses conP LEFT JOIN FETCH c.country ");
+		builder.append("LEFT JOIN FETCH c.country cont LEFT JOIN FETCH c.contractBcrs LEFT JOIN FETCH c.contractContacts LEFT JOIN FETCH c.contractCssts ");
+		builder.append("LEFT JOIN FETCH c.contractDeliveryCenters cdc LEFT JOIN FETCH cdc.deliveryCenter ");
+		builder.append(" LEFT JOIN FETCH c.imtCountries LEFT JOIN FETCH c.monthlyStatuses ms " );
+		
+		
+		builder.append(" LEFT JOIN FETCH ms.monthlyOperationalMeasures mom " );
+		builder.append(" LEFT JOIN FETCH mom.omServiceLevelAggrements oldSla " );
+//		builder.append(" LEFT JOIN FETCH ms.monthlyBusinessControls mbc LEFT JOIN FETCH ms.monthlyCustomerSatisfactions mcs  " );
+//		builder.append(" LEFT JOIN FETCH mom.omSlas omsla LEFT JOIN FETCH mom.omSlos omslo " );
+//		builder.append(" LEFT JOIN FETCH omsla.sla sla LEFT JOIN FETCH omslo.slo slo " );
+		
+		builder.append(" WHERE c.contractId in (:contract)");
+		builder.append(" and ms.month = :month and ms.year = :year ");
+		Contract contract = null;
+		try {
+			Query query = entityManager.createQuery(builder.toString());
+			query.setHint("javax.persistence.cache.storeMode", CacheStoreMode.REFRESH);
+			query.setParameter("contract", contractId);
+			query.setParameter("month", month);
+			query.setParameter("year", year);
+			contract = (Contract) query.getSingleResult();
+		}
+		catch(Exception e){
+			throw new GPSException(e.getMessage(), e);
+		}
+		return contract;
+	}
+	
+	@Override
+	public Contract getFaScmSLOReportByContract(Integer contractId, Integer month, Integer year) throws GPSException {
+		StringBuilder builder = new StringBuilder();
+		builder.append("SELECT c FROM Contract c LEFT JOIN FETCH c.customer cust LEFT JOIN FETCH c.industrySect isect LEFT JOIN FETCH c.tower t ");
+		builder.append("LEFT JOIN FETCH c.contractProcesses conP LEFT JOIN FETCH c.country ");
+		builder.append("LEFT JOIN FETCH c.country cont LEFT JOIN FETCH c.contractBcrs LEFT JOIN FETCH c.contractContacts LEFT JOIN FETCH c.contractCssts ");
+		builder.append("LEFT JOIN FETCH c.contractDeliveryCenters cdc LEFT JOIN FETCH cdc.deliveryCenter ");
+		builder.append(" LEFT JOIN FETCH c.imtCountries LEFT JOIN FETCH c.monthlyStatuses ms " );
+		
+		
+		builder.append(" LEFT JOIN FETCH ms.monthlyOperationalMeasures mom " );
+		builder.append(" LEFT JOIN FETCH mom.omServiceLevelObjectives oldSlo " );
+//		builder.append(" LEFT JOIN FETCH ms.monthlyBusinessControls mbc LEFT JOIN FETCH ms.monthlyCustomerSatisfactions mcs  " );
+//		builder.append(" LEFT JOIN FETCH mom.omSlas omsla LEFT JOIN FETCH mom.omSlos omslo " );
+//		builder.append(" LEFT JOIN FETCH omsla.sla sla LEFT JOIN FETCH omslo.slo slo " );
+		
+		builder.append(" WHERE c.contractId in (:contract)");
+		builder.append(" and ms.month = :month and ms.year = :year ");
+		Contract contract = null;
+		try {
+			Query query = entityManager.createQuery(builder.toString());
+			query.setHint("javax.persistence.cache.storeMode", CacheStoreMode.REFRESH);
+			query.setParameter("contract", contractId);
+			query.setParameter("month", month);
+			query.setParameter("year", year);
+			contract = (Contract) query.getSingleResult();
+		}
+		catch(Exception e){
+			throw new GPSException(e.getMessage(), e);
+		}
+		return contract;
+	}
+
+    @Override
+    public List<Contract> getAllContractsForRcaForm(String sessionId) throws GPSException {
+        StringBuilder builder = new StringBuilder();
+        builder.append("SELECT c FROM Contract c LEFT JOIN c.sessionAcls acl ");
+        builder.append(" where acl.formType in ('rca','RCA') and acl.sessionId = :sessionId ");
+        builder.append(" ORDER BY c.title asc ");
+        List<Contract> contracts = null;
+        try {
+            Query query = entityManager.createQuery(builder.toString());
+            query.setParameter("sessionId", sessionId);
+            contracts = (List<Contract>)query.getResultList();
+        }
+        catch(Exception e){
+            throw new GPSException(e.getMessage(), e);
+        }
+        return contracts;
+    }
+
+
+    @Override
+	public void saveContract(Contract contract) {		
+		entityManager.persist(contract);		
+	}
+	
+	@Override
+	public void remove(Object obj) {
+		entityManager.remove(obj);
+	}
+	
+	@Override
+	public List<Integer> getContractIdsByQueryParam(String sQuery,List<Object> queryParameters) {
+		Query query = entityManager.createQuery(sQuery);
+		int i = 1;
+		for(Object parameter: queryParameters){
+			query.setParameter("A" + i++, parameter);
+		}
+		return	query.getResultList();
+	}
+	
+	@Override
+	public List<Contract> getContractsByQuery(String stringQuery)  throws GPSException{
+		List<Contract> listContract = null;
+		try {
+			Query query  = entityManager.createQuery(stringQuery);
+			listContract = (List<Contract>)query.getResultList();
+		}
+		catch(Exception e){
+		//	throw new GPSException(e.getMessage(), e);
+            log.error(e.getMessage(),e);
+		}
+		return listContract;
+	}
+	
+	@Override
+	public List<Object[]>  getContractsByQueryParameters(Integer pageNo, String sQuery,List<Object> queryParameters) {
+		Query query = entityManager.createQuery(sQuery);
+		int i = 1;
+		for(Object parameter: queryParameters){
+			query.setParameter("A" + i++, parameter);
+		}
+		query.setHint("javax.persistence.cache.retrieveMode", CacheRetrieveMode.BYPASS);
+		int startRow = (pageNo.intValue() * Pagination.PAGE_SIZE.intValue()) - Pagination.PAGE_SIZE.intValue();
+		
+//		query.setFirstResult(startRow);
+//		query.setMaxResults(Pagination.PAGE_SIZE.intValue());
+		return	query.getResultList();
+	}
+	
+	@Override
+	@SuppressWarnings("unchecked")
+	public Long getCountContractsByQueryParameters(String query,List<Object> queryParameters) {
+		Query q = entityManager.createQuery(query);
+		int i = 1;
+		for(Object parameter: queryParameters){
+			q.setParameter("A" + i++, parameter);
+		}
+				
+		return	(Long) q.getSingleResult();
+	}
+	
+	@Override
+	public void save(Object obj) {
+		entityManager.persist(obj);
+	}
+	
+	/**
+	  * This DAO method returns list of Active contracts ('Transformation','Steady State','Phase Out')
+	  * 
+	  * @return
+	  * @throws GPSException
+	  * @authorWaqar Malik
+	  */
+	@Override
+	public Integer getMaxContractId() throws GPSException{
+		Integer maxId = null;
+		try {
+			TypedQuery<Integer> query  = entityManager.createQuery("select max(contractId) from Contract", Integer.class);
+			maxId = query.getSingleResult();
+		}
+		catch(Exception e){
+			throw new GPSException(e.getMessage(), e);
+		}
+		return maxId;
+	}
+
+	/**
+	  * This DAO method returns list of Active contracts ('Transformation','Steady State','Phase Out')
+	  * 
+	  * @return
+	  * @throws GPSException
+	  * @authorWaqar Malik
+	  */
+	@Override
+	public List<Contract> listActiveContracts() throws GPSException {
+		List<Contract> listContract = null;
+		try {
+			Query query  = entityManager.createQuery("from Contract c where c.currentPhaseId in (2,3,4) order by c.title");
+			listContract = query.getResultList();
+		}
+		catch(Exception e){
+			throw new GPSException(e.getMessage(), e);
+		}
+		return listContract;
+	}
+
+	 /**
+	  * This DAO method returns single contract by Id.
+	  * 
+	  * @param contractId
+	  * @return
+	  * @throws GPSException
+	  * @authorWaqar Malik
+	  */
+	@Override
+	public Contract getContractById(Integer contractId) throws GPSException {
+		StringBuilder builder = new StringBuilder();
+		builder.append("SELECT c FROM Contract c ");
+		builder.append("LEFT JOIN FETCH c.customer cus ");
+		builder.append(" WHERE c.contractId = :contractId");
+
+		Contract contract = null;
+		try {
+			Query query = entityManager.createQuery(builder.toString());
+			query.setHint("javax.persistence.cache.storeMode", CacheStoreMode.REFRESH);
+			query.setParameter("contractId", contractId);
+			contract =  (Contract) query.getSingleResult();
+		}
+		catch(Exception e){
+			log.error(e.getMessage(), e);
+		}
+		return contract;
+	}
+
+	@Override
+	public Contract getContractByIdFilledProcess(Integer contractId)
+			throws GPSException {
+		Contract contract = null;
+		try {
+			Query query  = entityManager.createQuery("from Contract c LEFT JOIN FETCH c.contractPhases where c.contractId = :contractId");
+			query.setParameter("contractId", contractId);
+			contract = (Contract) query.getSingleResult();
+		}
+		catch(Exception e){
+			throw new GPSException(e.getMessage(), e);
+		}
+		return contract;
+	}
+	
+	
+	@Override
+	public Contract getContractsForFormGeneration(String formName)
+			throws GPSException {
+		Contract contract = null;
+		try {
+			Query query  = entityManager.createQuery("from Contract c where c.contractId = :contractId");
+			//query.setParameter("contractId", contractId);
+			contract = (Contract) query.getResultList();
+		}
+		catch(Exception e){
+			throw new GPSException(e.getMessage(), e);
+		}
+		return contract;
+	}
+
+    @Override
+    public Contract getProfileDetailedReport(Integer contractId) throws GPSException {
+        StringBuilder builder = new StringBuilder();
+
+        builder.append("SELECT c FROM Contract c INNER JOIN FETCH c.country cou INNER JOIN FETCH c.tower tow ");
+        builder.append("LEFT JOIN FETCH c.bpdUser usr ");
+        builder.append("LEFT JOIN FETCH c.industrySect indSect ");
+        builder.append("LEFT JOIN FETCH c.contractPhases cp ");
+        builder.append("LEFT JOIN FETCH cp.phas ph ");
+      //  builder.append(" WHERE ph.phaseId = c.currentPhaseId");
+        builder.append(" WHERE c.contractId = :contractId");
+
+       Contract contract = null;
+        try {
+            Query query = entityManager.createQuery(builder.toString());
+            query.setHint("javax.persistence.cache.storeMode", CacheStoreMode.REFRESH);
+            query.setParameter("contractId", contractId);
+            contract =  (Contract) query.getSingleResult();
+        }
+        catch(Exception e){
+        	log.debug(e.getMessage());
+            throw new GPSException(e.getMessage(), e);
+        }
+        return contract;
+    }
+
+
+    @Override
+    public Contract getProfileProcesses(Integer contractId) throws GPSException {
+        StringBuilder builder = new StringBuilder();
+        builder.append("SELECT c FROM Contract c INNER JOIN FETCH c.tower tow ");
+        builder.append("INNER JOIN FETCH c.contractProcesses ctprocess ");
+        builder.append("INNER JOIN FETCH ctprocess.process proc ");
+        builder.append(" WHERE c.contractId = :contractId");
+
+        Contract contract = null;
+        try {
+            Query query = entityManager.createQuery(builder.toString());
+            query.setHint("javax.persistence.cache.storeMode", CacheStoreMode.REFRESH);
+            query.setParameter("contractId", contractId);
+            contract =  (Contract) query.getSingleResult();
+
+        }
+        catch(Exception e){
+            throw new GPSException(e.getMessage(), e);
+        }
+        return contract;
+    }
+
+    @Override
+    public Contract getProfileCusSatSurveys(Integer contractId) throws GPSException {
+        StringBuilder builder = new StringBuilder();
+        builder.append("SELECT c FROM Contract c INNER JOIN FETCH c.tower tow ");
+        builder.append("INNER JOIN FETCH c.contractCssts cc ");
+        builder.append("INNER JOIN FETCH cc.customerSatisfactionSurveyType cusSatSurType ");
+        builder.append(" WHERE c.contractId = :contractId");
+
+        Contract contract = null;
+        try {
+            Query query = entityManager.createQuery(builder.toString());
+            query.setHint("javax.persistence.cache.storeMode", CacheStoreMode.REFRESH);
+            query.setParameter("contractId", contractId);
+            contract =  (Contract) query.getSingleResult();
+        }
+        catch(Exception e){
+            throw new GPSException(e.getMessage(), e);
+        }
+        return contract;
+    }
+
+
+    @Override
+    public Contract getProfileCusBcrs(Integer contractId) throws GPSException {
+        StringBuilder builder = new StringBuilder();
+        builder.append("SELECT c FROM Contract c INNER JOIN FETCH c.tower tow ");
+        builder.append("INNER JOIN FETCH c.contractBcrs cbcr ");
+        builder.append("INNER JOIN FETCH cbcr.bcrType bcrType ");
+        builder.append(" WHERE c.contractId = :contractId");
+
+        Contract contract = null;
+        try {
+            Query query = entityManager.createQuery(builder.toString());
+            query.setHint("javax.persistence.cache.storeMode", CacheStoreMode.REFRESH);
+            query.setParameter("contractId", contractId);
+            contract =  (Contract) query.getSingleResult();
+        }
+        catch(Exception e){
+            throw new GPSException(e.getMessage(), e);
+        }
+        return contract;
+    }
+
+    @Override
+    public Contract getProfileContractContacts(Integer contractId) throws GPSException {
+        StringBuilder builder = new StringBuilder();
+        builder.append("SELECT c FROM Contract c ");
+        builder.append("INNER JOIN FETCH c.contractContacts cc ");
+        builder.append("INNER JOIN FETCH cc.contactType ccContactType ");
+        builder.append(" WHERE c.contractId = :contractId");
+
+        Contract contract = null;
+        try {
+            Query query = entityManager.createQuery(builder.toString());
+            query.setHint("javax.persistence.cache.storeMode", CacheStoreMode.REFRESH);
+            query.setParameter("contractId", contractId);
+            contract =  (Contract) query.getSingleResult();
+        }
+        catch(Exception e){
+            throw new GPSException(e.getMessage(), e);
+        }
+        return contract;
+    }
+
+    @Override
+    public Contract getProfileSloDetails(Integer contractId) throws GPSException {
+        StringBuilder builder = new StringBuilder();
+        builder.append("SELECT c FROM Contract c ");
+        builder.append("INNER JOIN FETCH c.country cou ");
+        builder.append("INNER JOIN FETCH c.contractProcesses ctprocess ");
+       // builder.append("INNER JOIN FETCH ctprocess.process process ");
+        builder.append("INNER JOIN FETCH ctprocess.slos slo ");
+        builder.append("LEFT JOIN FETCH slo.subProcess subProcess ");
+        builder.append("WHERE c.contractId = :contractId");
+
+        Contract contract = null;
+        try {
+            Query query = entityManager.createQuery(builder.toString());
+            query.setHint("javax.persistence.cache.storeMode", CacheStoreMode.REFRESH);
+            query.setParameter("contractId", contractId);
+            contract = (Contract) query.getSingleResult();
+        } catch (Exception e) {
+            throw new GPSException(e.getMessage(), e);
+        }
+        return contract;
+    }
+
+    @Override
+    public Contract getProfileSlaDetails(Integer contractId) throws GPSException {
+        StringBuilder builder = new StringBuilder();
+        builder.append("SELECT c FROM Contract c ");
+        builder.append("INNER JOIN FETCH c.country cou ");
+        builder.append("INNER JOIN FETCH c.contractProcesses ctprocess ");
+        // builder.append("INNER JOIN FETCH ctprocess.process process ");
+        builder.append("INNER JOIN FETCH ctprocess.slas sla ");
+        builder.append("LEFT JOIN FETCH sla.subProcess subProcess ");
+        builder.append("WHERE c.contractId = :contractId");
+
+        Contract contract = null;
+        try {
+            Query query = entityManager.createQuery(builder.toString());
+            query.setHint("javax.persistence.cache.storeMode", CacheStoreMode.REFRESH);
+            query.setParameter("contractId", contractId);
+            contract = (Contract) query.getSingleResult();
+        } catch (Exception e) {
+            throw new GPSException(e.getMessage(), e);
+        }
+        return contract;
+    }
+}
+
+

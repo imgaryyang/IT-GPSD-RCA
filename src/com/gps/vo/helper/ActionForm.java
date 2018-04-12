@@ -1,0 +1,82 @@
+/**<pre> 
+ *==========================================================================
+ *
+ * Copyright: (C) IBM Corporation 2013 -- IBM Internal Use Only
+ *
+ *==========================================================================
+ *
+ *    FILE: ACLForm.java
+ *    CREATOR:Waqar Malik
+ *    DEPT: GBS PAK
+ *    DATE: 17/07/2013
+ *
+ *-PURPOSE-----------------------------------------------------------------
+ * 
+ *--------------------------------------------------------------------------
+ *
+ *
+ *-CHANGE LOG--------------------------------------------------------------
+ * 17/07/2013Waqar Malik Initial coding.
+ *==========================================================================
+ * </pre> */
+package com.gps.vo.helper;
+
+import com.gps.vo.RcaAction;
+
+import java.io.Serializable;
+
+/**
+ * This class is a helper vo for UI.
+
+ */
+
+public class ActionForm implements Serializable{
+
+     private  RcaAction rcaAction;
+     private ActionHelper actionHelper;
+     private String formAction;
+     private String userRoles;
+    private String formSavedMessage;
+
+
+    public RcaAction getRcaAction() {
+        return rcaAction;
+    }
+
+    public void setRcaAction(RcaAction rcaAction) {
+        this.rcaAction = rcaAction;
+    }
+
+    public ActionHelper getActionHelper() {
+        return actionHelper;
+    }
+
+    public void setActionHelper(ActionHelper actionHelper) {
+        this.actionHelper = actionHelper;
+    }
+
+    public String getFormAction() {
+        return formAction;
+    }
+
+    public void setFormAction(String formAction) {
+        this.formAction = formAction;
+    }
+
+
+    public String getUserRoles() {
+        return userRoles;
+    }
+
+    public void setUserRoles(String userRoles) {
+        this.userRoles = userRoles;
+    }
+
+    public void setFormSavedMessage(String formSavedMessage) {
+        this.formSavedMessage = formSavedMessage;
+    }
+
+    public String getFormSavedMessage() {
+        return formSavedMessage;
+    }
+}

@@ -1,0 +1,103 @@
+<%@ taglib prefix="form" uri="http://www.springframework.org/tags/form"%>
+<%@ taglib prefix="spring" uri="http://www.springframework.org/tags"%>
+
+
+<style type="text/css">
+.ibm-common-overlay input[type="password"] {
+	border: 1px solid #eee;
+	color: #666;
+	padding: 3px;
+}
+
+.ibm-common-overlay input[type="password"]:hover {
+	border: 1px solid #ccc;
+	color: #666;
+}
+
+.ibm-common-overlay input[type="password"]:focus {
+	border: 1px solid #ccc;
+	color: #666;
+	background: #666;
+	filter: progid : DXImageTransform.Microsoft.gradient ( startColorstr =
+		'#666', endColorstr = '#eee' );
+	background: -webkit-gradient(linear, left top, left bottom, from(#666),
+		to(#eee) );
+	background: -moz-linear-gradient(top, #666, #eee);
+	background: -o-linear-gradient(top, #666, #eee);
+}
+</style>
+
+<div class="ibm-container ibm-alternate ibm-buttons-last">
+<div class="ibm-container-body">
+
+<p class="ibm-overlay-intro" style="text-align: justify;">GPSDRCA requires a valid IBM Intranet ID & Password to log-in. User IDs must be authorized at the account or group level in order to view account data.</p>
+
+
+
+<div><p><span id="validationResponse" style="color: #CC0000;">
+	${ErrorMessage}
+</span></p></div>
+
+
+<form:form id="loginForm" action="login.do" commandName="userVo" class="ibm-column-form" method="POST" style="margin-top: 5px;">
+<p><label for="userName">User name:</label><span><form:input path="userName" size="20" cssStyle="width: 175px;" maxlength="200" cssClass="required"/></span></p>
+<p><label for="password">Password:</label><span><form:password path="password" showPassword="true" size="20" cssStyle="width: 175px;" maxlength="200" cssClass="required" onfocus="if(dojo.byId('userName').value != ''){ dojo.byId('password').value = ''}else{dojo.byId('userName').focus()}" /></span></p>
+<div class="ibm-overlay-rule"><hr /></div> 
+<div class="ibm-buttons-row">
+<p>
+<input value="Sign-in" id="signin-submit-btn" type="button" name="ibm-submit" class="ibm-btn-arrow-pri"  onClick="return validateUser();" onSubmit="return validateUser();" />
+<span class="ibm-sep">&nbsp;</span>
+<input value="Cancel" id="signin-cancel-btn" type="button" name="ibm-cancel" class="ibm-btn-cancel-sec" onclick="ibmweb.overlay.hide('signin-box');"/>
+</p>
+</div>
+</form:form>
+</div>
+</div>
+
+
+<script type="text/javascript">
+try{
+	if(dojo.byId("userName").val() == ""){
+		dojo.byId("userName").focus();
+	}else{
+		dojo.byId("password").focus();
+	}
+}catch(e){}
+
+	function validateUser(){
+		// Local var representing if the form has been sent at all
+		//var hasBeenSent = false;
+		// Local var representing node to be updated
+		var contractListDiv = dojo.byId("validationResponse");
+		// Using dojo.xhrPost, as the amount of data sent could be large
+		dojo.xhrPost({
+		    // The URL of the request
+		    url: "validateUser.do",
+		    form: dojo.byId("loginForm"),
+		    // The success handler
+		    load: function(response) {
+		    	
+		    	if(response != null && response == "SUCCESS"){
+		    		dojo.byId("loginForm").submit();
+					return true;
+				}else {
+					contractListDiv.innerHTML = response;
+					return false;
+				}
+		    },
+		    // The error handler
+		    error: function() {
+		    	contractListDiv.innerHTML = "An error occured, please try again.";
+		    		return false;
+		    },
+		    // The complete handler
+		    handle: function() {
+		       // hasBeenSent = true;
+		    }
+		});
+		
+	}
+
+</script>
+
+

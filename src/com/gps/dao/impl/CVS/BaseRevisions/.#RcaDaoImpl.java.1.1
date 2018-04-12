@@ -1,0 +1,234 @@
+package com.gps.dao.impl;
+
+import com.gps.dao.RcaDao;
+import com.gps.exceptions.GPSException;
+import com.gps.vo.Rca;
+import org.apache.log4j.Logger;
+import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
+
+import javax.persistence.*;
+import java.sql.Timestamp;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+
+@Repository
+@Transactional(propagation= Propagation.REQUIRED)
+public class RcaDaoImpl implements RcaDao {
+	private static final Logger log = Logger.getLogger(RcaDaoImpl.class);
+
+	@PersistenceContext
+	private EntityManager entityManager;
+
+
+    @Override
+    public List<Rca> getAllRcas() {
+        StringBuilder builder = new StringBuilder();
+        List<Rca> rcaList = null;
+        try {
+            builder.append("SELECT r FROM Rca r LEFT JOIN FETCH r.rcaActions rActions ");
+            builder.append("ORDER BY r.rcaNumber ");
+            Query query = entityManager.createQuery(builder.toString());
+            query.setHint("javax.persistence.cache.storeMode", CacheStoreMode.REFRESH);
+            rcaList = (List<Rca>) query.getResultList();
+        } catch (Exception e) {
+            throw new GPSException(e.getMessage(), e);
+        }
+        return rcaList;
+    }
+
+    @Override
+    public Set<Rca> getRcaListByMonthAndYear(int month, int year) {
+        Set<Rca> rcas = null;
+        StringBuilder queryString = new StringBuilder();
+        queryString.append("from Rca r LEFT JOIN FETCH r.rcaActions ra ");
+         queryString.append("where r.month = :month and r.year = :year ");
+        try {
+            Query query  = entityManager.createQuery(queryString.toString());
+            query.setParameter("month", month);
+            query.setParameter("year", year);
+            rcas = new HashSet<Rca>(query.getResultList());
+        }
+        catch(Exception e){
+            throw new GPSException(e.getMessage(), e);
+        }
+        return rcas;
+    }
+
+    @Override
+    public List<Object[]> getRcaListByQueryParameters(String sQuery, List<Object> queryParameters) {
+        List<Object[]> rcaList = null;
+        Query query = entityManager.createQuery(sQuery);
+        int i = 1;
+        for(Object parameter: queryParameters){
+            query.setParameter("A" + i++, parameter);
+        }
+        rcaList = query.getResultList();
+        return rcaList;
+    }
+
+    @Override
+    public List<Rca> getRcasByQueryParameters(String sQuery, List<Object> queryParameters) {
+        List<Rca> rcaList = null;
+        Query query = entityManager.createQuery(sQuery);
+        int i = 1;
+        for(Object parameter: queryParameters){
+            query.setParameter("A" + i++, parameter);
+        }
+        rcaList = (List<Rca>)query.getResultList();
+        return rcaList;
+    }
+
+    @Override
+    public Rca getRcaById(Integer rcaId) {
+        StringBuilder builder = new StringBuilder();
+        Rca rca = null;
+        try {
+            builder.append("SELECT r FROM Rca r ");
+            builder.append("LEFT JOIN FETCH r.rcaActions rActions ");
+            builder.append("LEFT JOIN FETCH r.contract c ");
+            builder.append("LEFT JOIN FETCH c.customer cus ");
+         //   builder.append("LEFT JOIN FETCH r.rcaTickets tickets ");
+            builder.append("WHERE r.rcaId=:rcaId ");
+            Query query = entityManager.createQuery(builder.toString());
+            query.setHint("javax.persistence.cache.storeMode", CacheStoreMode.REFRESH);
+            query.setParameter("rcaId", rcaId);
+            rca = (Rca) query.getSingleResult();
+        } catch (Exception e) {
+           // throw new GPSException(e.getMessage(), e);
+        }
+        return rca;
+    }
+
+    @Override
+    public void createRca(Rca rca) {
+        try {
+            entityManager.persist(rca);
+        }
+        catch (Exception e){
+            throw new GPSException(e.getMessage(),e);
+        }
+    }
+
+    @Override
+    public void updateRca(Rca rca) {
+        try {
+            entityManager.merge(rca);
+        }
+        catch (Exception e){
+            throw new GPSException(e.getMessage(),e);
+        }
+   }
+
+    @Override
+    public Integer getTotalNumberOfRca() {
+        StringBuilder builder = new StringBuilder();
+        Integer totalRCAs = 0;
+        try {
+            builder.append("SELECT count(*) FROM Rca r ");
+            Query query = entityManager.createQuery(builder.toString());
+            query.setHint("javax.persistence.cache.storeMode", CacheStoreMode.REFRESH);
+            totalRCAs = (Integer) query.getSingleResult();
+        } catch (Exception e) {
+            // throw new GPSException(e.getMessage(), e);
+        }
+        return totalRCAs;
+    }
+
+    @Override
+    public Integer getMaxRcaId() throws GPSException {
+        Integer maxId = null;
+        try {
+            TypedQuery<Integer> query  = entityManager.createQuery("select max(rcaId) from Rca", Integer.class);
+            maxId = query.getSingleResult();
+        }
+        catch(Exception e){
+            throw new GPSException(e.getMessage(), e);
+        }
+        return maxId;
+    }
+
+    @Override
+    public Rca getRcaByNumber(String rcaNumber) {
+        StringBuilder builder = new StringBuilder();
+        Rca rca = null;
+        try {
+            builder.append("SELECT r FROM Rca r ");
+            builder.append("LEFT JOIN FETCH r.rcaActions rActions ");
+            builder.append("LEFT JOIN FETCH r.contract c ");
+            builder.append("LEFT JOIN FETCH c.customer cus ");
+            builder.append("LEFT JOIN FETCH r.rcaEventDetail ed ");
+            builder.append("LEFT JOIN FETCH r.rcaPreventionDetail pd ");
+            builder.append("WHERE r.rcaNumber=:rcaNumber ");
+            Query query = entityManager.createQuery(builder.toString());
+            query.setHint("javax.persistence.cache.storeMode", CacheStoreMode.REFRESH);
+            query.setParameter("rcaNumber", rcaNumber);
+            rca = (Rca) query.getSingleResult();
+        } catch (Exception e) {
+          log.error(e.getMessage(),e);
+        }
+        return rca;
+    }
+
+    @Override
+    public Integer getCountByMonthAndYear(Integer month, Integer year) throws GPSException {
+        StringBuilder builder = new StringBuilder();
+        Integer count = null;
+        try {
+            builder.append("SELECT count(*) FROM Rca r ");
+         //   builder.append("WHERE r.month=:month ");
+         //   builder.append("AND r.year=:year ");
+            Query query = entityManager.createQuery(builder.toString());
+            query.setHint("javax.persistence.cache.storeMode", CacheStoreMode.REFRESH);
+           // query.setParameter("month", month);
+           // query.setParameter("year", year);
+            count = (Integer) query.getSingleResult();
+        } catch (Exception e) {
+            // throw new GPSException(e.getMessage(), e);
+        }
+        return count;   }
+
+    @Override
+    public List<Rca> getRcaListByContractId(String contractIds) {
+        StringBuilder builder = new StringBuilder();
+        List<Rca> rcaList = null;
+        try {
+            builder.append("SELECT r FROM Rca r ");
+            builder.append("LEFT JOIN FETCH r.rcaActions rActions ");
+            builder.append("LEFT JOIN FETCH r.contract c ");
+            builder.append("LEFT JOIN FETCH c.sessionAcls acl ");
+            builder.append("WHERE c.contractId IN (:contractIds) ");
+            Query query = entityManager.createQuery(builder.toString());
+            query.setHint("javax.persistence.cache.storeMode", CacheStoreMode.REFRESH);
+            query.setParameter("contractIds", contractIds);
+            rcaList = (List<Rca>) query.getResultList();
+        } catch (Exception e) {
+            log.error(e.getMessage(),e);
+        }
+        return rcaList;
+    }
+
+    @Override
+    public Set<Rca> getRcaListByOutageDates(Timestamp startOutageDate, Timestamp endOutageDate) {
+        Set<Rca> rcas = null;
+        StringBuilder queryString = new StringBuilder();
+        queryString.append("from Rca r LEFT JOIN FETCH r.rcaActions ra ");
+        queryString.append("where r.incidentStartTime >= :startOutageDate and r.incidentEntTime <= :endOutageDate ");
+        try {
+            Query query  = entityManager.createQuery(queryString.toString());
+            query.setParameter("startOutageDate", startOutageDate);
+            query.setParameter("endOutageDate", endOutageDate);
+            rcas = new HashSet<Rca>(query.getResultList());
+        }
+        catch(Exception e){
+            throw new GPSException(e.getMessage(), e);
+        }
+        return rcas;
+    }
+
+}
+
+
+

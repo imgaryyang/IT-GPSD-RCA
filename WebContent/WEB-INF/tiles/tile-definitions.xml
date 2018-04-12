@@ -1,0 +1,301 @@
+<?xml version="1.0" encoding="ISO-8859-1" ?>
+<!DOCTYPE tiles-definitions PUBLIC
+        "-//Apache Software Foundation//DTD Tiles Configuration 2.0//EN"
+        "http://tiles.apache.org/dtds/tiles-config_2_0.dtd">
+<tiles-definitions>
+    <definition name="base.definition" template="/WEB-INF/jsp/common/layout.jsp">
+        <put-attribute name="doctype" value="/WEB-INF/jsp/common/doctype.jsp"/>
+        <put-attribute name="meta" value="/WEB-INF/jsp/common/meta.jsp"/>
+        <put-attribute name="title" value=""/>
+        <put-attribute name="script" value="/WEB-INF/jsp/common/script.jsp"/>
+        <put-attribute name="header" value="/WEB-INF/jsp/common/header.jsp"/>
+        <put-attribute name="leadSpaces" value="/WEB-INF/jsp/common/leadSpaces.jsp"/>
+        <put-attribute name="navigation" value="navigation.tabs"/>
+        <put-attribute name="content" value=""/>
+        <put-attribute name="footer" value="/WEB-INF/jsp/common/footer.jsp"/>
+    </definition>
+    <definition name="navigation.tabs" template="/WEB-INF/jsp/common/navigation.jsp"/>
+
+    <definition name="contractSearchFilter" template="/WEB-INF/jsp/contract/contracts.jsp">
+        <put-attribute name="searchFilter" value="/WEB-INF/jsp/common/contractFilter.jsp"/>
+    </definition>
+
+    <definition name="welcome" template="/WEB-INF/jsp/welcome/login.jsp"/>
+    <definition name="login" template="/WEB-INF/jsp/welcome/login.jsp"/>
+
+    <definition name="home" extends="base.definition">
+        <put-attribute name="title" value="Welcome to GPSDRCA"/>
+        <put-attribute name="content" value="/WEB-INF/jsp/home/home.jsp"/>
+    </definition>
+
+
+    <definition name="contracts" extends="base.definition">
+        <put-attribute name="title" value="Welcome to GPSDRCA"/>
+        <put-attribute name="content" value="contractSearchFilter"/>
+    </definition>
+
+    <definition name="contractList" template="/WEB-INF/jsp/contract/contractList.jsp"></definition>
+    <definition name="addSLA" template="/WEB-INF/jsp/contract/addSLA.jsp"></definition>
+    <definition name="dropSLA" template="/WEB-INF/jsp/contract/addSLA.jsp"></definition>
+    <definition name="addSLO" template="/WEB-INF/jsp/contract/addSLO.jsp"></definition>
+    <definition name="dropSLO" template="/WEB-INF/jsp/contract/addSLO.jsp"></definition>
+
+
+
+    <!-- RCA -->
+    <definition name="rcas" extends="base.definition">
+        <put-attribute name="title" value="GPSDRCA - RCA/Actions Listing"/>
+        <put-attribute name="content" value="rcaSearchFilter"/>
+    </definition>
+
+    <definition name="rcaList" template="/WEB-INF/jsp/rca/rcaList.jsp"></definition>
+
+    <definition name="rcaSearchFilter" template="/WEB-INF/jsp/rca/rca.jsp">
+        <put-attribute name="searchFilter" value="/WEB-INF/jsp/common/rcaFilter.jsp"/>
+    </definition>
+
+    <definition name="loadRCACoordinators" template="/WEB-INF/jsp/rca/rcaCoordinators.jsp"></definition>
+
+    <definition name="loadRCATickets" template="/WEB-INF/jsp/rca/rcaTickets.jsp"></definition>
+
+    <definition name="loadRCAContributingCauses" template="/WEB-INF/jsp/rca/rcaContributingCauses.jsp"></definition>
+
+    <definition name="loadRcaActions" template="/WEB-INF/jsp/rca/rcaActions.jsp"></definition>
+
+    <definition name="loadRcaHistoryLog" template="/WEB-INF/jsp/rca/rcaHistoryLog.jsp"></definition>
+
+    <definition name="faces" template="/WEB-INF/jsp/action/faces.jsp"></definition>
+
+
+    <definition name="editRca" extends="base.definition">
+        <put-attribute name="leadSpaces" value=""/>
+        <put-attribute name="title" value="GPSDRCA - Edit RCA"/>
+        <put-attribute name="content" value="/WEB-INF/jsp/rca/editRca.jsp"/>
+    </definition>
+    <!-- End of RCA Configuration -->
+
+    <!-- Start RCA Action Configuration -->
+
+    <definition name="showRcaAction" extends="base.definition">
+        <put-attribute name="leadSpaces" value=""/>
+        <put-attribute name="title" value="GPSDRCA - RCA Action"/>
+        <put-attribute name="content" value="/WEB-INF/jsp/action/showRcaAction.jsp"/>
+    </definition>
+
+
+    <!-- Report forms -->
+
+    <definition name="reports" extends="base.definition">
+        <put-attribute name="title" value="GPSDRCA - Reports"/>
+        <put-attribute name="content" value="reportsContents"/>
+    </definition>
+
+    <definition name="reportsContents" template="/WEB-INF/jsp/report/reports.jsp">
+        <put-attribute name="rcaReportFilter" value="/WEB-INF/jsp/common/rcaReportFilter.jsp"/>
+    </definition>
+
+    <definition name="reportRcaList" template="/WEB-INF/jsp/report/reportRcaList.jsp"></definition>
+
+
+    <definition name="monthlyDisclose" extends="base.definition">
+        <put-attribute name="title" value="GPSCHIP - Reports"/>
+        <put-attribute name="content" value="monthlyReportsContents"/>
+    </definition>
+
+    <definition name="weeklyReports" extends="base.definition">
+        <put-attribute name="title" value="GPSCHIP - Reports"/>
+        <put-attribute name="content" value="weeklyReportsContents"/>
+    </definition>
+
+
+
+    <definition name="contractReportsSearchFilter" template="/WEB-INF/jsp/report/contractReports.jsp">
+        <put-attribute name="searchFilter" value="/WEB-INF/jsp/common/contractFilter.jsp"/>
+    </definition>
+
+
+
+    <definition name="profileReports" extends="base.definition">
+        <put-attribute name="title" value="GPSCHIP - Reports"/>
+        <put-attribute name="content" value="contractReportsSearchFilter"/>
+    </definition>
+
+    <definition name="transReports" extends="base.definition">
+        <put-attribute name="title" value="GPSCHIP - Reports"/>
+        <put-attribute name="content" value="weeklyTransReportsContents"/>
+    </definition>
+
+
+
+    <!-- Admin forms -->
+    <definition name="generate-cvr-tile" template="/WEB-INF/jsp/admin/generateCvrForm.jsp">
+    </definition>
+    <definition name="generate_cvr_form" extends="base.definition">
+        <put-attribute name="leadSpaces" value=""/>
+        <put-attribute name="title" value="GPSCHIP - CVR dashboard"/>
+        <put-attribute name="content" value="generate-cvr-tile"/>
+    </definition>
+
+    <definition name="generate-cvr1-tile" template="/WEB-INF/jsp/contract/generateCvrForm1.jsp">
+    </definition>
+    <definition name="generate_cvr_form1" extends="base.definition">
+        <put-attribute name="title" value="GPSCHIP - CVR dashboard"/>
+        <put-attribute name="content" value="generate-cvr1-tile"/>
+    </definition>
+
+
+    <definition name="weekly-form-tile" template="/WEB-INF/jsp/weekly/weekly_bpd_form.jsp">
+    </definition>
+
+    <definition name="weekly1-form-tile" template="/WEB-INF/jsp/weekly/weeklytransition_bpd_form.jsp">
+        <put-attribute name="leadSpaces" value=""/>
+    </definition>
+
+    <definition name="weekly2-form-tile" template="/WEB-INF/jsp/weekly/weeklytransition_daksh_form.jsp">
+    </definition>
+
+    <definition name="daksh_lob" template="/WEB-INF/jsp/weekly/daksh_lob.jsp">
+    </definition>
+
+    <definition name="bpd_phase" template="/WEB-INF/jsp/weekly/bpd_phase.jsp">
+    </definition>
+
+    <definition name="newcontract_support_form" extends="base.definition">
+        <put-attribute name="title" value="Welcome to GPSDRCA"/>
+        <put-attribute name="content" value="support-form-tile"/>
+    </definition>
+
+    <definition name="weekly_bpd_form" extends="base.definition">
+        <put-attribute name="title" value="Welcome to GPSDRCA"/>
+        <put-attribute name="content" value="weekly-form-tile"/>
+    </definition>
+
+    <definition name="weeklytransition_bpd_form" extends="base.definition">
+        <put-attribute name="title" value="Welcome to GPSDRCA"/>
+        <put-attribute name="content" value="weekly1-form-tile"/>
+    </definition>
+
+    <definition name="weeklytransition_daksh_form" extends="base.definition">
+        <put-attribute name="title" value="Welcome to GPSDRCA"/>
+        <put-attribute name="content" value="weekly2-form-tile"/>
+    </definition>
+
+
+    <definition name="admin" extends="base.definition">
+        <put-attribute name="leadSpaces" value=""/>
+        <put-attribute name="title" value="GPSDRCA - Admin"/>
+        <put-attribute name="content" value="/WEB-INF/jsp/admin/admin.jsp"/>
+    </definition>
+
+    <definition name="generateMonthlyForms" extends="base.definition">
+        <put-attribute name="title" value="GPSCHIP - Admin"/>
+        <put-attribute name="content" value="/WEB-INF/jsp/admin/generateMonthlyForms.jsp"/>
+    </definition>
+
+    <definition name="generateWeeklyForms" extends="base.definition">
+        <put-attribute name="title" value="GPSCHIP - Admin"/>
+        <put-attribute name="content" value="/WEB-INF/jsp/admin/generateWeeklyForms.jsp"/>
+    </definition>
+
+    <definition name="modifyAcl" template="/WEB-INF/jsp/admin/modifyAcl.jsp"></definition>
+    <definition name="editSingleAcl" template="/WEB-INF/jsp/admin/singleContract.jsp"></definition>
+    <definition name="editNonContractAcl" template="/WEB-INF/jsp/admin/nonContract.jsp"></definition>
+
+    <definition name="aclForms" template="/WEB-INF/jsp/admin/aclHome.jsp">
+        <put-attribute name="leadSpaces" value=""/>
+        <put-attribute name="singleContract" value="/WEB-INF/jsp/admin/singleContract.jsp"/>
+        <put-attribute name="nonContract" value="/WEB-INF/jsp/admin/nonContract.jsp"/>
+        <put-attribute name="groupACL" value="/WEB-INF/jsp/admin/groupACL.jsp"/>
+    </definition>
+
+    <definition name="addACL" extends="base.definition">
+        <put-attribute name="title" value="GPSDRCA - Add ACL Form"/>
+        <put-attribute name="content" value="aclForms"/>
+    </definition>
+
+    <!-- User Roles -->
+
+    <definition name="addUserRole" extends="base.definition">
+        <put-attribute name="title" value="GPSDRCA - Add User Role Form"/>
+        <put-attribute name="content" value="userRoleForms"/>
+    </definition>
+
+    <definition name="userRoleForms" template="/WEB-INF/jsp/admin/userRoleHome.jsp">
+        <put-attribute name="leadSpaces" value=""/>
+        <put-attribute name="addUR" value="/WEB-INF/jsp/admin/addUserRole.jsp"/>
+    </definition>
+
+    <definition name="modifyUserRole" template="/WEB-INF/jsp/admin/modifyUserRole.jsp"></definition>
+    <definition name="editUserRole" template="/WEB-INF/jsp/admin/addUserRole.jsp"></definition>
+
+
+    <!-- Contract forms -->
+    <definition name="editContract" extends="base.definition">
+        <put-attribute name="leadSpaces" value=""/>
+        <put-attribute name="title" value="GPSDRCA - Edit Account"/>
+        <put-attribute name="content" value="/WEB-INF/jsp/contract/editContract.jsp"/>
+    </definition>
+
+    <definition name="showAddContract" extends="base.definition">
+        <put-attribute name="leadSpaces" value=""/>
+        <put-attribute name="title" value="GPSDRCA - Add New Account"/>
+        <put-attribute name="content" value="/WEB-INF/jsp/contract/addContract.jsp"/>
+    </definition>
+
+    <definition name="showModifyContract" extends="base.definition">
+        <put-attribute name="leadSpaces" value=""/>
+        <put-attribute name="title" value="GPSDRCA - Modify Account"/>
+        <put-attribute name="content" value="/WEB-INF/jsp/contract/modifyContract.jsp"/>
+    </definition>
+
+    <definition name="modifyDeleteContracts" extends="base.definition">
+        <put-attribute name="title" value="Modify and Delete Contracts"/>
+        <put-attribute name="content" value="/WEB-INF/jsp/contract/modifyDeleteContracts.jsp"/>
+    </definition>
+
+    <definition name="modifyDeleteContractList"
+                template="/WEB-INF/jsp/contract/modifyDeleteContractList.jsp"></definition>
+
+    <definition name="addRcaCoordinator" template="/WEB-INF/jsp/contract/contractRcaCoordinators.jsp"></definition>
+
+
+    <!-- Support forms -->
+    <definition name="support-form-tile" template="/WEB-INF/jsp/support/newcontract_support_form.jsp"></definition>
+    <definition name="archiveList" template="/WEB-INF/jsp/support/archiveList.jsp"></definition>
+
+    <definition name="support" extends="base.definition">
+        <put-attribute name="title" value="GPSDRCA - Support Forms"/>
+        <put-attribute name="content" value="/WEB-INF/jsp/support/support.jsp"/>
+    </definition>
+
+    <definition name="accessRequest" extends="base.definition">
+        <put-attribute name="title" value="GPSDRCA - Support - RCA Access Request Form"/>
+        <put-attribute name="content" value="/WEB-INF/jsp/support/accessRequest.jsp"/>
+    </definition>
+
+    <definition name="removeAccessRequest" extends="base.definition">
+        <put-attribute name="title" value="GPSDRCA - Support - Remove Access Request Form"/>
+        <put-attribute name="content" value="/WEB-INF/jsp/support/removeAccessRequest.jsp"/>
+    </definition>
+
+    <definition name="modifyContract" extends="base.definition">
+        <put-attribute name="title" value="GPSDRCA - Support Modify Contract Form"/>
+        <put-attribute name="content" value="/WEB-INF/jsp/support/modifyContract.jsp"/>
+    </definition>
+
+    <definition name="newContract" extends="base.definition">
+        <put-attribute name="title" value="GPSDRCA - Support New Contract Form"/>
+        <put-attribute name="content" value="/WEB-INF/jsp/support/newContract.jsp"/>
+    </definition>
+
+    <definition name="archiveSearchFilter" template="/WEB-INF/jsp/support/archive.jsp">
+        <put-attribute name="searchFilter" value="/WEB-INF/jsp/support/archivefilter.jsp"/>
+    </definition>
+
+    <definition name="archive" extends="base.definition">
+        <put-attribute name="title" value="GPSDRCA - Support New Contract Form"/>
+        <put-attribute name="content" value="archiveSearchFilter"/>
+    </definition>
+
+
+</tiles-definitions>

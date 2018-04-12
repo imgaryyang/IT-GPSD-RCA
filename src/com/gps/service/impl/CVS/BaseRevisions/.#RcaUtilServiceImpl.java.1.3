@@ -1,0 +1,374 @@
+package com.gps.service.impl;
+
+
+import com.gps.dao.RcaCauseDao;
+import com.gps.dao.RcaSupportingFileDao;
+import com.gps.dao.RcaTicketDao;
+import com.gps.service.*;
+import com.gps.util.BluePages;
+import com.gps.util.CommonUtil;
+import com.gps.util.UserSession;
+import com.gps.vo.*;
+import com.gps.vo.helper.RcaForm;
+import com.gps.vo.helper.RcaListing;
+import com.gps.web.validator.FileValidator;
+import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.io.IOUtils;
+import org.apache.commons.lang.StringUtils;
+import org.apache.log4j.Logger;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+import org.springframework.validation.BindingResult;
+import org.springframework.web.multipart.MultipartFile;
+
+import javax.servlet.http.HttpSession;
+import java.io.IOException;
+import java.io.InputStream;
+import java.sql.Timestamp;
+import java.util.*;
+
+/**
+ * Created by Waqar Malik on 23-12-2014.
+ */
+@Service
+public class RcaUtilServiceImpl implements RcaUtilService {
+
+    private static Logger log = Logger.getLogger(RcaUtilServiceImpl.class);
+
+    @Autowired
+    UserRoleService userRoleService;
+
+    @Autowired
+    GpsUserService gpsUserService;
+
+    @Autowired
+    SessionACLService sessionACLService;
+
+    @Autowired
+    RcaService rcaService;
+
+    @Autowired
+    FileValidator fileValidator;
+
+    @Autowired
+    RcaSupportingFileDao rcaSupportingFileDao;
+
+    @Autowired
+    RcaTicketDao rcaTicketDao;
+
+    @Autowired
+    RcaCauseDao rcaCauseDao;
+
+
+    @Override
+    public boolean isGlobalCoordinator(int userId) {
+        List<UserRole> userRoles = userRoleService.getUserRolesByUserId(userId);
+        if (CollectionUtils.isNotEmpty(userRoles)) {
+            for (UserRole userRole : userRoles) {
+                if (userRole.getRole().equals("coordinator") && userRole.getContract() == null) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    @Override
+    public boolean isGlobalDpe(int userId) {
+        List<UserRole> userRoles = userRoleService.getUserRolesByUserId(userId);
+        if (CollectionUtils.isNotEmpty(userRoles)) {
+            for (UserRole userRole : userRoles) {
+                if (userRole.getRole().equals("dpe") && userRole.getContract() == null) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    @Override
+    public boolean isGlobalDelegate(int userId) {
+        List<UserRole> userRoles = userRoleService.getUserRolesByUserId(userId);
+        if (CollectionUtils.isNotEmpty(userRoles)) {
+            for (UserRole userRole : userRoles) {
+                if (userRole.getRole().equals("delegate") && userRole.getContract() == null) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    @Override
+    public boolean isGlobalOwner(int userId) {
+        List<UserRole> userRoles = userRoleService.getUserRolesByUserId(userId);
+        if (CollectionUtils.isNotEmpty(userRoles)) {
+            for (UserRole userRole : userRoles) {
+                if (userRole.getRole().equals("owner") && userRole.getContract() == null) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    @Override
+    public boolean isGlobalEditor(int userId) {
+        List<UserRole> userRoles = userRoleService.getUserRolesByUserId(userId);
+        if (CollectionUtils.isNotEmpty(userRoles)) {
+            for (UserRole userRole : userRoles) {
+                if (userRole.getRole().equals("editor") && userRole.getContract() == null) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    @Override
+    public List<Contract> loadInitiateRcaContracts(UserSession userSession, Map<String, Object> referenceData, HttpSession session) {
+        List<Contract> initiateRcaContracts = new ArrayList<Contract>();
+
+        GpsUser loggedInUser = gpsUserService.getUserByIntranetId(userSession.getGpsUser().getEmail());
+        if (loggedInUser == null) {
+            loggedInUser = new GpsUser();
+            loggedInUser.setEmail(userSession.getGpsUser().getEmail());
+            gpsUserService.addUser(loggedInUser);
+        }
+
+        List<Contract> rcaContracts = new ArrayList<Contract>((TreeSet<Contract>) referenceData.get("listRcaContracts"));
+        for (Contract contract : rcaContracts) {
+            List<UserRole> roles = userRoleService.getUserRolesByUserId(loggedInUser.getUserId());
+            if (CollectionUtils.isNotEmpty(roles)) {
+                for (UserRole role : roles) {
+                    if (!role.getRole().equalsIgnoreCase("reader")
+                            && (role.getContract() == null || String.valueOf(role.getContract().getContractId()).equalsIgnoreCase(String.valueOf(contract.getContractId())))) {
+                        if (!initiateRcaContracts.contains(contract)) {
+                            initiateRcaContracts.add(contract);
+                        }
+                    }
+                }
+            }
+        }
+        return initiateRcaContracts;
+
+    }
+
+    public List<String> loadPrimaryTickets(List<RcaListing> dataList) {
+        List<String> primaryTickets = new ArrayList<String>();
+        if (CollectionUtils.isNotEmpty(dataList)) {
+            for (Object object : dataList) {
+                RcaListing rcaListing = (RcaListing) object;
+                if (StringUtils.isNotBlank(rcaListing.getPrimaryTicket()) && !primaryTickets.contains(rcaListing.getPrimaryTicket())) {
+                    primaryTickets.add(rcaListing.getPrimaryTicket());
+                }
+            }
+        }
+        return primaryTickets;
+    }
+
+    @Override
+    public Set<String> getRcaCoordinatorsFromRcaList(List<Rca> rcaList) {
+        Set<String> rcaCoordinators = new HashSet<String>();
+        for (Rca rca : rcaList) {
+            if (StringUtils.isNotBlank(rca.getRcaCoordinatorId())) {
+                rcaCoordinators.add(rca.getRcaCoordinatorId());
+            }
+        }
+        return rcaCoordinators;
+    }
+
+    @Override
+    public Set<Coordinator> getCoordinators(Set<RcaCoordinator> rcaCoordinators) {
+        Map<String, Coordinator> coordinatorMap = new HashMap<String, Coordinator>();
+        for (RcaCoordinator rcaCoordinator : rcaCoordinators) {
+            if (rcaCoordinator != null && rcaCoordinator.getCoordinator() != null) {
+                Coordinator coordinator = rcaCoordinator.getCoordinator();
+                coordinator.setCoordinatorId(rcaCoordinator.getRcaCoordinatorId());
+                coordinator.setNotesId(BluePages.getNotesIdFromIntranetId(coordinator.getIntranetId()));
+                if (!coordinatorMap.containsKey(coordinator.getIntranetId())) {
+                    coordinatorMap.put(coordinator.getIntranetId(), coordinator);
+                }
+            }
+        }
+        return new HashSet<Coordinator>(coordinatorMap.values());
+    }
+
+    @Override
+    public boolean isGlobalReader(int userId) {
+        List<UserRole> userRoles = userRoleService.getUserRolesByUserId(userId);
+        if (CollectionUtils.isNotEmpty(userRoles)) {
+            for (UserRole userRole : userRoles) {
+                if (userRole.getRole().equals("reader") && userRole.getContract() == null) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    @Override
+    public boolean isGlobalCreator(int userId) {
+        List<UserRole> userRoles = userRoleService.getUserRolesByUserId(userId);
+        if (CollectionUtils.isNotEmpty(userRoles)) {
+            for (UserRole userRole : userRoles) {
+                if (userRole.getRole().equals("creator") && userRole.getContract() == null) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    @Override
+    public boolean isAdmin(int userId) {
+        List<UserRole> userRoles = userRoleService.getUserRolesByUserId(userId);
+        if (CollectionUtils.isNotEmpty(userRoles)) {
+            for (UserRole userRole : userRoles) {
+                if (userRole.getRole().equals("admin") && userRole.getContract() == null) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    @Override
+    public boolean supportingFileProcessed(MultipartFile file, RcaForm rcaForm, BindingResult result, GpsUser loggedInUser) {
+        if (!file.isEmpty() && file.getSize() > 0L) {
+            log.info("uploaded file: " + file.getOriginalFilename() + ", Type = " + file.getContentType() + ", size = " + file.getSize());
+            fileValidator.validate(file, result);
+            if (!result.hasErrors()) {
+                try {
+                    saveFileInDb(file, rcaForm.getFileDescription(), rcaForm.getRca(), loggedInUser);
+                } catch (Exception e) {
+                    log.error(e.getMessage());
+                    return false;
+                }
+            } else {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    @Override
+    public void saveFileInDb(MultipartFile file, String fileDescription, Rca rca, GpsUser loggedInUser) {
+        log.debug("saving file: " + file.getOriginalFilename());
+        Calendar now = Calendar.getInstance();
+        RcaSupportingFile rcaSupportingFile = new RcaSupportingFile();
+        try {
+            InputStream fis = file.getInputStream();
+            byte[] data = IOUtils.toByteArray(fis);
+            rcaSupportingFile.setContents(data);
+            log.debug("Total file size to save (in bytes) : " + rcaSupportingFile.getContents().length);
+        } catch (IOException e) {
+            log.error(e.getMessage(), e);
+        } catch (Exception e) {
+            log.error(e.getMessage(), e);
+        }
+        rcaSupportingFile.setMime(file.getContentType());
+        rcaSupportingFile.setType(CommonUtil.getFileType(file.getContentType(), file.getOriginalFilename()));
+        rcaSupportingFile.setName(file.getOriginalFilename());
+        rcaSupportingFile.setSize(file.getSize());
+        rcaSupportingFile.setSaveDateTime(new Timestamp(now.getTimeInMillis()));
+        rcaSupportingFile.setDescription(fileDescription);
+        rcaSupportingFile.setUploadedBy(loggedInUser);
+        rcaSupportingFile.setRca(rca);
+        try {
+            rcaSupportingFileDao.addRcaSupportingFile(rcaSupportingFile);
+        } catch (Exception gpe) {
+            log.error(gpe.getMessage(), gpe);
+        }
+    }
+
+
+    @Override
+    public void processDeletedFiles(RcaForm rcaForm) {
+        if (CollectionUtils.isNotEmpty(rcaForm.getSupportingFiles())) {
+            List<RcaSupportingFile> supportingFiles = rcaForm.getSupportingFiles();
+            for (RcaSupportingFile supportingFile : supportingFiles) {
+                RcaSupportingFile rcaSupportingFile = rcaSupportingFileDao.getFileById(supportingFile.getFileId());
+                if (supportingFile.getIsDeleted().equalsIgnoreCase("Y")) {
+                    rcaSupportingFileDao.deleteRcaSupportingFile(rcaSupportingFile);
+                }
+            }
+        }
+    }
+
+    @Override
+    public void loadSupportingFiles(Rca rca, RcaForm rcaForm) {
+        List<RcaSupportingFile> rcaFiles = new ArrayList<RcaSupportingFile>();
+        try {
+            List<RcaSupportingFile> supportingFiles = rcaSupportingFileDao.getAllFileByRcaId(rca.getRcaId());
+            if (CollectionUtils.isNotEmpty(supportingFiles)) {
+                for (RcaSupportingFile rcaSupportingFile : supportingFiles) {
+                    if (rcaSupportingFile.getSaveDateTime() != null) {
+                        rcaSupportingFile.setUploadedTime(CommonUtil.convertTimestampToString(rcaSupportingFile.getSaveDateTime()));
+                        if (rcaSupportingFile.getUploadedBy() != null) {
+                            GpsUser uploadedBy = rcaSupportingFile.getUploadedBy();
+                            uploadedBy.setNotesId(BluePages.getNotesIdFromIntranetId(rcaSupportingFile.getUploadedBy().getEmail()));
+                            rcaSupportingFile.setUploadedBy(uploadedBy);
+                        }
+                        rcaFiles.add(rcaSupportingFile);
+                    }
+                }
+            }
+        } catch (Exception e) {
+            //  log.error(e.getMessage(),e);
+        }
+        rcaForm.setSupportingFiles(rcaFiles);
+    }
+
+    @Override
+    public void saveRcaTickets(List<RcaTicket> rcaTickets) {
+        if (CollectionUtils.isNotEmpty(rcaTickets)) {
+            for (RcaTicket rcaTicket : rcaTickets) {
+                RcaTicket dbRcaTicket = rcaTicketDao.getRcaTicketById(rcaTicket.getRcaTicketId());
+                if (dbRcaTicket != null) {
+                    try {
+                        dbRcaTicket.setSeverity(rcaTicket.getSeverity());
+                        dbRcaTicket.setAssociatedTool(rcaTicket.getAssociatedTool());
+                        dbRcaTicket.setTicketNum(rcaTicket.getTicketNum());
+                        rcaTicketDao.updateRcaTicket(dbRcaTicket);
+                    } catch (Exception e) {
+                        log.error(e.getMessage(), e);
+                    }
+                }
+            }
+        }
+    }
+
+    @Override
+    public void saveRcaCauses(List<RcaCause> rcaCauses) {
+        if (CollectionUtils.isNotEmpty(rcaCauses)) {
+            for (RcaCause rcaCause : rcaCauses) {
+                RcaCause dbRcaCause = rcaCauseDao.getRcaCauseById(rcaCause.getRcaCauseId());
+                if (dbRcaCause != null) {
+                    try {
+                        dbRcaCause.setServiceProvider(rcaCause.getServiceProvider());
+                        dbRcaCause.setOtherServiceProvider(rcaCause.getOtherServiceProvider());
+                        dbRcaCause.setOutageCategory(rcaCause.getOutageCategory());
+                        dbRcaCause.setLocationOfBusinessImpact(rcaCause.getLocationOfBusinessImpact());
+                        dbRcaCause.setOtherLocOfBusinessImpact(rcaCause.getOtherLocOfBusinessImpact());
+                        dbRcaCause.setOutageSubCategory(rcaCause.getOutageSubCategory());
+                        dbRcaCause.setOutageSubCategory2(rcaCause.getOutageSubCategory2());
+                        dbRcaCause.setLocOfSystem(rcaCause.getLocOfSystem());
+                        dbRcaCause.setRootOrContributingCause(rcaCause.getRootOrContributingCause());
+                        dbRcaCause.setCauseCategory(rcaCause.getCauseCategory());
+                        dbRcaCause.setCauseSubCategory(rcaCause.getCauseSubCategory());
+                        dbRcaCause.setCauseSelectionGuidance(rcaCause.getCauseSelectionGuidance());
+                        dbRcaCause.setCauseSummary(rcaCause.getCauseSummary());
+                        rcaCauseDao.updateRcaCause(dbRcaCause);
+                    } catch (Exception e) {
+                        log.error(e.getMessage(), e);
+                    }
+                }
+            }
+        }
+    }
+
+
+
+
+}

@@ -1,0 +1,694 @@
+package com.gps.service.impl;
+
+import com.gps.dao.ContractDao;
+import com.gps.dao.ContractRequestDao;
+import com.gps.dao.EmailTemplateDao;
+import com.gps.exceptions.GPSException;
+import com.gps.service.SupportService;
+import com.gps.util.ConstantDataManager;
+import com.gps.util.GPSMailer;
+import com.gps.vo.ContractRequest;
+import com.gps.vo.EmailTemplate;
+import com.gps.vo.helper.ArchiveSearchFilter;
+import com.gps.vo.helper.Constant;
+import org.apache.commons.lang.StringUtils;
+import org.apache.log4j.Logger;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.*;
+
+/**
+ * This class provides implementation of ACLService.
+ *
+ * @authorWaqar Malik
+ */
+@Service
+public class SupportServiceImpl implements SupportService {
+    private static Logger log = Logger.getLogger(SupportServiceImpl.class);
+
+    @Autowired
+    ContractRequestDao contractRequestDao;
+
+    @Autowired
+    ContractDao contractDao;
+
+
+    @Autowired
+    EmailTemplateDao emailTemplateDao;
+
+    @Autowired
+    GPSMailer gPSMailer;
+
+    @Value(value = "#{'${support.email.notification}'}")
+    private String supportNotifications;
+
+    @Override
+    @Transactional
+    public void cancelContractRequest(Long requestId) throws GPSException {
+        ContractRequest contractRequest = contractRequestDao.getContractRequestById(requestId);
+        contractRequestDao.dropContractRequest(contractRequest);
+
+    }
+
+    @Override
+    @Transactional
+    public void markArchive(Long requestId) throws GPSException {
+        ContractRequest contractRequest = contractRequestDao.getContractRequestById(requestId);
+        contractRequest.setIsArchive(Constant.YES);
+        contractRequestDao.updateContractRequest(contractRequest);
+
+    }
+
+    @Override
+    @Transactional
+    public void processContractRequest(ContractRequest contractRequest) throws GPSException {
+        log.debug("processContractRequest()......" + contractRequest.getFormAction());
+        if (contractRequest.getFormAction() == null || contractRequest.getFormAction().isEmpty()) {
+            throw new GPSException("No action found associated with form submission. Try again later.");
+        }
+        // process all request.
+
+        if (contractRequest.getFormAction().equalsIgnoreCase("back")) {
+            // do nothing.
+        } else if (contractRequest.getFormAction().equalsIgnoreCase(ConstantDataManager.SUBMIT)) {
+            addContractRequest(contractRequest);
+        } else if (contractRequest.getFormAction().equalsIgnoreCase(ConstantDataManager.CLOSE)) {
+            closeContractRequest(contractRequest);
+            markArchive(contractRequest.getRequestId());
+        } else if (contractRequest.getFormAction().equalsIgnoreCase("reject")) {
+            rejectContractRequest(contractRequest);
+            // markArchive(contractRequest.getRequestId());
+        } else if (contractRequest.getFormAction().equalsIgnoreCase("approve")) {
+            approveContractRequest(contractRequest);
+            // markArchive(contractRequest.getRequestId());
+        } else if (contractRequest.getFormAction().equalsIgnoreCase("resubmit")) {
+            Long requestId = contractRequest.getRequestId();
+            ContractRequest tempContractRequest = contractRequestDao.getContractRequestById(requestId);
+            tempContractRequest.setProfileApprovedLevel(contractRequest.getProfileApprovedLevel());
+            tempContractRequest.setProfileActiveLevel(contractRequest.getProfileActiveLevel());
+            tempContractRequest.setBusinessPurpose(contractRequest.getBusinessPurpose());
+            tempContractRequest.setProfileEmail(contractRequest.getProfileEmail());
+            tempContractRequest.setRequestedRole(contractRequest.getRequestedRole());
+            tempContractRequest.setAccessRequestType(contractRequest.getAccessRequestType());
+            tempContractRequest.setContractName(contractRequest.getContractName());
+            tempContractRequest.setContractId(contractRequest.getContractId());
+            updateContractRequest(tempContractRequest);
+
+            sendRcaAccessRequestResubmitted(tempContractRequest);
+            sendAccessRequestApproval(tempContractRequest);
+        } else {
+            log.debug("no action was associated with the request: " + contractRequest.getContractName());
+        }
+    }
+
+    private void sendRcaAccessRequestResubmitted(ContractRequest contractRequest) {
+        try {
+            Boolean isNotification = Boolean.parseBoolean(supportNotifications);
+            if (!isNotification) {
+                return;
+            }
+            EmailTemplate emailTemplate = emailTemplateDao.getEmailTemplateByName("RE_SUBMIT_RCA_ACCESS_REQUEST");
+            Hashtable<String, String> keys = getValueMap(contractRequest);
+            if (emailTemplate != null) {
+                String to = getToEmail(emailTemplate.getToEmail(), contractRequest);
+                String body = com.gps.util.StringUtils.replaceAll(emailTemplate.getBody(), keys);
+                String subject = com.gps.util.StringUtils.replaceAll(emailTemplate.getSubject(), keys);
+                String cc = getToEmail(emailTemplate.getCcEmail(), contractRequest);
+                List<String> recipients = new ArrayList<String>();
+                List<String> ccList = new ArrayList<String>();
+                if (to == null) {
+                   // to = "gpsrca@pk.ibm.com";
+                    to = "gsupport@pk.ibm.com";
+                }
+
+                recipients.add(to);
+                ccList.add(cc);
+
+                gPSMailer.sendEmail(emailTemplate.getFromAlias(), subject, body, recipients, ccList);
+            }
+        } catch (Exception e) {
+            log.error(e.getMessage(), e);
+        }
+        log.debug("notifaction sent to users.");
+    }
+
+
+    @Override
+    public ContractRequest getContractRequest(Long requestId) throws GPSException {
+        return contractRequestDao.getContractRequestById(requestId);
+    }
+
+    @Override
+    public List<ContractRequest> listAwaitingRequests(String requestedBy) throws GPSException {
+        List<ContractRequest> listContractRequest = null;
+        try {
+            listContractRequest = contractRequestDao.listAwaitingRequests(requestedBy);
+            log.debug("Awaiting requests = " + listContractRequest.size());
+        } catch (GPSException e) {
+            log.error(e.getMessage(), e);
+        }
+        return listContractRequest;
+    }
+
+    @Override
+    public List<ContractRequest> listRequiringAction() throws GPSException {
+        List<ContractRequest> listContractRequest = null;
+        try {
+            listContractRequest = contractRequestDao.listRequiringAction();
+        } catch (Exception e) {
+            log.error(e.getMessage(), e);
+        }
+        return listContractRequest;
+    }
+
+    @Override
+    public List<ContractRequest> listArchive(ArchiveSearchFilter searchFilter, String userEmail) throws GPSException {
+        List<ContractRequest> listContractRequest = null;
+
+        List<Object> queryParameters = new ArrayList<Object>();
+        String query = "from ContractRequest cr ";
+        String orderBy = " ORDER BY cr.requestId asc";
+        StringBuilder whereClause = new StringBuilder();
+        int index = 1;
+
+        if (searchFilter.getMonth() != null) {
+            whereClause.append(" and cr.month = :A" + index++);
+            queryParameters.add(searchFilter.getMonth());
+        }
+
+        if (searchFilter.getYear() != null) {
+            whereClause.append(" and cr.year = :A" + index++);
+            queryParameters.add(searchFilter.getYear());
+        }
+
+        if (!isNullOrEmpty(searchFilter.getForm())) {
+            whereClause.append(" and cr.requestType like :A" + index++);
+            queryParameters.add(searchFilter.getForm() + "%");
+
+        }
+
+        if (!isNullOrEmpty(searchFilter.getState())) {
+            whereClause.append(" and cr.status like :A" + index++);
+            queryParameters.add(searchFilter.getState() + "%");
+
+        }
+
+        if (!isNullOrEmpty(searchFilter.getSubmitter())) {
+            whereClause.append(" and cr.requestedBy like :A" + index++);
+            queryParameters.add(searchFilter.getSubmitter() + "%");
+
+        }
+
+        if (!isNullOrEmpty(searchFilter.getApprover())) {
+            whereClause.append(" and cr.towerLeadId like :A" + index++);
+            queryParameters.add(searchFilter.getApprover() + "%");
+
+        }
+
+        if (!isNullOrEmpty(userEmail)) {
+            whereClause.append(" and cr.requestedBy =  :A" + index++);
+            queryParameters.add(userEmail);
+        }
+
+        if (!isNullOrEmpty(whereClause.toString())) {
+            query = query + " WHERE cr.isArchive = 'Y' " + whereClause.toString();
+        } else {
+            //make sure only archives are listed in any case.
+            query = query + " WHERE cr.isArchive = 'Y' ";
+        }
+        log.debug("query: " + query);
+        log.debug("whereClause: {" + whereClause + "}");
+
+        query = query + orderBy;
+
+        listContractRequest = contractRequestDao.getContractRequestsByParam(query, queryParameters);
+        if (listContractRequest != null)
+            log.debug("number of archive requests found = " + listContractRequest.size());
+        return listContractRequest;
+    }
+
+
+    public List<String> listSubmitters() throws GPSException {
+        List<String> submitters = null;
+        try {
+            submitters = contractRequestDao.listSubmitters();
+        } catch (GPSException e) {
+            log.error(e.getMessage(), e);
+        }
+        if (submitters != null)
+            log.debug("number of submitters found = " + submitters.size());
+        return submitters;
+    }
+
+    public List<String> listApprovers() throws GPSException {
+        List<String> approvers = null;
+        try {
+            approvers = contractRequestDao.listApprovers();
+        } catch (GPSException e) {
+            log.error(e.getMessage(), e);
+        }
+        if (approvers != null)
+            log.debug("number of approvers found = " + approvers.size());
+        return approvers;
+    }
+
+
+    private boolean isNullOrEmpty(String str) {
+        return str == null || str.equals("") ? true : false;
+    }
+
+    /**
+     * @param contractRequest
+     * @throws GPSException
+     */
+    private void reviewContractRequest(ContractRequest contractRequest) throws GPSException {
+        ContractRequest tempContractRequest = null;
+        if (contractRequest.getRequestId() != null) {
+            tempContractRequest = contractRequestDao.getContractRequestById(contractRequest.getRequestId());
+            tempContractRequest.setActionDate(new Date());
+            tempContractRequest.setStatus(Constant.SAVED_STATE);
+            tempContractRequest.setRejectionComments(null);
+
+
+            tempContractRequest.setProfileApprovedLevel(contractRequest.getProfileApprovedLevel());
+            tempContractRequest.setProfileActiveLevel(contractRequest.getProfileActiveLevel());
+            tempContractRequest.setDpescActiveLevel(contractRequest.getDpescActiveLevel());
+            tempContractRequest.setDpescApprovedLevel(contractRequest.getDpescApprovedLevel());
+
+            contractRequestDao.updateContractRequest(tempContractRequest);
+            log.debug("successfully reviewed contract request.");
+            //send emails, BPDreviewACLStandForm, BPDreviewADDStandForm, BPDreviewModifyStandForm
+            String templateName = "";
+            if (Constant.ACCESS_REQUEST.equals(contractRequest.getRequestType())) {
+                templateName = "BPDreviewACLStandForm";
+            } else if (Constant.NEW_CONTRACT_REQUEST.equals(contractRequest.getRequestType())) {
+                templateName = "BPDreviewADDStandForm";
+            } else if (Constant.MOD_CONTRACT_REQUEST.equals(contractRequest.getRequestType())) {
+                templateName = "BPDreviewModifyStandForm";
+            }
+            sendNotification(templateName, tempContractRequest);
+        }
+        //send emails
+
+    }
+
+    /**
+     * @param contractRequest
+     * @throws GPSException
+     */
+    private void closeContractRequest(ContractRequest contractRequest) throws GPSException {
+        ContractRequest tempContractRequest = null;
+        if (contractRequest.getRequestId() != null) {
+            tempContractRequest = contractRequestDao.getContractRequestById(contractRequest.getRequestId());
+            tempContractRequest.setActionDate(new Date());
+            tempContractRequest.setAccessRequestType(contractRequest.getAccessRequestType());
+            contractRequestDao.updateContractRequest(tempContractRequest);
+            log.debug("successfully returned contract request.");
+
+            sendRcaAccessRequestProcessed(tempContractRequest);
+        }
+    }
+
+    private void sendRcaAccessRequestProcessed(ContractRequest contractRequest) {
+        try {
+            Boolean isNotification = Boolean.parseBoolean(supportNotifications);
+            if (!isNotification) {
+                return;
+            }
+            EmailTemplate emailTemplate = emailTemplateDao.getEmailTemplateByName("RCA_ACCESS_REQUEST_PROCESSED");
+            Hashtable<String, String> keys = getValueMap(contractRequest);
+            if (emailTemplate != null) {
+                String to = getToEmail(emailTemplate.getToEmail(), contractRequest);
+                String body = com.gps.util.StringUtils.replaceAll(emailTemplate.getBody(), keys);
+                String subject = com.gps.util.StringUtils.replaceAll(emailTemplate.getSubject(), keys);
+                String cc = getToEmail(emailTemplate.getCcEmail(), contractRequest);
+                List<String> recipients = new ArrayList<String>();
+                List<String> ccList = new ArrayList<String>();
+                if (to == null) {
+                    //to = "gpsrca@pk.ibm.com";
+                    to = "gsupport@pk.ibm.com";
+                }
+
+                recipients.add(to);
+                // ccList.add(cc);
+
+                gPSMailer.sendEmail(emailTemplate.getFromAlias(), subject, body, recipients, ccList);
+            }
+        } catch (Exception e) {
+            log.error(e.getMessage(), e);
+        }
+        log.debug("notifaction sent to users.");
+    }
+
+    private void updateContractRequest(ContractRequest contractRequest) {
+        log.debug("modifying contractRequest...." + contractRequest.getRequestId());
+        Calendar calendar = Calendar.getInstance();
+        contractRequest.setDateRequested(calendar.getTime());
+        contractRequest.setStatus(Constant.NEW_STATE);
+        contractRequest.setIsArchive(Constant.NO);
+        contractRequest.setMonth(calendar.get(Calendar.MONTH) + 1);
+        contractRequest.setYear(calendar.get(Calendar.YEAR));
+
+
+        contractRequestDao.updateContractRequest(contractRequest);
+        log.debug("successfully added new contract request.");
+        String templateName = "";
+        if (Constant.ACCESS_REQUEST.equals(contractRequest.getRequestType())) {
+            templateName = "RE_SUBMIT_RCA_ACCESS_REQUEST";
+        } else if (Constant.NEW_CONTRACT_REQUEST.equals(contractRequest.getRequestType())) {
+            templateName = "RE_SUBMIT_ADD_NEW_ACCOUNT_REQUEST";
+        } else if (Constant.MOD_CONTRACT_REQUEST.equals(contractRequest.getRequestType())) {
+            templateName = "RE_SUBMIT_MODIFY_EXISTING_ACCOUNT_REQUEST";
+        } else if (Constant.REMOVE_ACCESS_REQUEST.equals(contractRequest.getRequestType())) {
+            templateName = "RE_SUBMIT_REMOVE_ACCESS_REQUEST";
+        }
+        // sendNotification(templateName, contractRequest);
+    }
+
+    /**
+     * private helper method for adding new request.
+     *
+     * @param contractRequest
+     * @throws GPSException
+     */
+    private void addContractRequest(ContractRequest contractRequest) throws GPSException {
+        try {
+            log.debug("adding contractRequest");
+            Calendar calendar = Calendar.getInstance();
+            contractRequest.setDateRequested(calendar.getTime());
+            contractRequest.setStatus(Constant.NEW_STATE);
+            contractRequest.setIsArchive(Constant.NO);
+            contractRequest.setMonth(calendar.get(Calendar.MONTH) + 1);
+            contractRequest.setYear(calendar.get(Calendar.YEAR));
+
+            contractRequestDao.addContractRequest(contractRequest);
+            log.debug("successfully added new contract request.");
+            String templateName = "";
+            if (Constant.ACCESS_REQUEST.equals(contractRequest.getRequestType())) {
+                templateName = "SUBMIT_RCA_ACCESS_REQUEST";
+                sendAccessRequestAcknowledgement(contractRequest);
+                sendAccessRequestApproval(contractRequest);
+            } else if (Constant.NEW_CONTRACT_REQUEST.equals(contractRequest.getRequestType())) {
+                templateName = "SUBMIT_ADD_NEW_ACCOUNT_REQUEST";
+                sendNotification(templateName, contractRequest);
+            } else if (Constant.MOD_CONTRACT_REQUEST.equals(contractRequest.getRequestType())) {
+                templateName = "SUBMIT_MODIFY_EXISTING_ACCOUNT_REQUEST";
+                sendNotification(templateName, contractRequest);
+            } else if (Constant.REMOVE_ACCESS_REQUEST.equals(contractRequest.getRequestType())) {
+                templateName = "SUBMIT_REMOVE_ACCESS_REQUEST";
+                sendNotification(templateName, contractRequest);
+            }
+
+        } catch (Exception e) {
+            log.error(e.getMessage(), e);
+        }
+    }
+
+    private void sendAccessRequestAcknowledgement(ContractRequest contractRequest) {
+        try {
+            Boolean isNotification = Boolean.parseBoolean(supportNotifications);
+            if (!isNotification) {
+                return;
+            }
+            EmailTemplate emailTemplate = emailTemplateDao.getEmailTemplateByName("SUBMIT_RCA_ACCESS_REQUEST");
+            Hashtable<String, String> keys = getValueMap(contractRequest);
+            if (emailTemplate != null) {
+                String to = contractRequest.getRequestedBy();
+                String body = com.gps.util.StringUtils.replaceAll(emailTemplate.getBody(), keys);
+                String subject = com.gps.util.StringUtils.replaceAll(emailTemplate.getSubject(), keys);
+                String cc = getToEmail(emailTemplate.getCcEmail(), contractRequest);
+                List<String> recipients = new ArrayList<String>();
+                List<String> ccList = new ArrayList<String>();
+                recipients.add(to);
+                ccList.add(cc);
+
+                gPSMailer.sendEmail(emailTemplate.getFromAlias(), subject, body, recipients, ccList);
+            }
+        } catch (Exception e) {
+            log.error(e.getMessage(), e);
+        }
+
+    }
+
+    private void sendAccessRequestApproval(ContractRequest contractRequest) {
+        try {
+            Boolean isNotification = Boolean.parseBoolean(supportNotifications);
+            if (!isNotification) {
+                return;
+            }
+            EmailTemplate emailTemplate = emailTemplateDao.getEmailTemplateByName("RCA_ACCESS_APPROVAL_REQUEST");
+            Hashtable<String, String> keys = getValueMap(contractRequest);
+            if (emailTemplate != null) {
+                String to = getToEmail(emailTemplate.getToEmail(), contractRequest);
+                String body = com.gps.util.StringUtils.replaceAll(emailTemplate.getBody(), keys);
+                String subject = com.gps.util.StringUtils.replaceAll(emailTemplate.getSubject(), keys);
+                String cc = getToEmail(emailTemplate.getCcEmail(), contractRequest);
+                List<String> recipients = new ArrayList<String>();
+                List<String> ccList = new ArrayList<String>();
+                if (to == null) {
+                    //to = "gpsrca@pk.ibm.com";
+                    to = "gsupport@pk.ibm.com";
+                }
+
+                recipients.add(to);
+                ccList.add(cc);
+
+                gPSMailer.sendEmail(emailTemplate.getFromAlias(), subject, body, recipients, ccList);
+            }
+        } catch (Exception e) {
+            log.error(e.getMessage(), e);
+        }
+        log.debug("notifaction sent to users.");
+    }
+
+
+    private void sendRcaAccessRequestApproved(ContractRequest contractRequest) {
+        try {
+            Boolean isNotification = Boolean.parseBoolean(supportNotifications);
+            if (!isNotification) {
+                return;
+            }
+            EmailTemplate emailTemplate = emailTemplateDao.getEmailTemplateByName("RCA_ACCESS_REQUEST_APPROVED");
+            Hashtable<String, String> keys = getValueMap(contractRequest);
+            if (emailTemplate != null) {
+                String to = getToEmail(emailTemplate.getToEmail(), contractRequest);
+                String body = com.gps.util.StringUtils.replaceAll(emailTemplate.getBody(), keys);
+                String subject = com.gps.util.StringUtils.replaceAll(emailTemplate.getSubject(), keys);
+                String cc = getToEmail(emailTemplate.getCcEmail(), contractRequest);
+                String bcc = getToEmail(emailTemplate.getBccEmail(), contractRequest);
+                List<String> recipients = new ArrayList<String>();
+                List<String> ccList = new ArrayList<String>();
+
+                recipients.add(to);
+                //   ccList.add(cc);
+                gPSMailer.sendEmail(emailTemplate.getFromAlias(), subject, body, recipients, ccList);
+            }
+        } catch (Exception e) {
+            log.error(e.getMessage(), e);
+        }
+
+    }
+
+    /**
+     * @param templateName
+     * @param contractRequest
+     */
+    private void sendNotification(String templateName, ContractRequest contractRequest) {
+        try {
+            Boolean isNotification = Boolean.parseBoolean(supportNotifications);
+            if (!isNotification) {
+                return;
+            }
+            EmailTemplate emailTemplate = emailTemplateDao.getEmailTemplateByName(templateName);
+            Hashtable<String, String> keys = getValueMap(contractRequest);
+            if (emailTemplate != null) {
+                String to = getToEmail(emailTemplate.getToEmail(), contractRequest);
+                String body = com.gps.util.StringUtils.replaceAll(emailTemplate.getBody(), keys);
+                String subject = com.gps.util.StringUtils.replaceAll(emailTemplate.getSubject(), keys);
+                String cc = getToEmail(emailTemplate.getCcEmail(), contractRequest);
+                String bcc = getToEmail(emailTemplate.getBccEmail(), contractRequest);
+                List<String> recipients = new ArrayList<String>();
+                List<String> ccList = new ArrayList<String>();
+
+                if (to == null) {
+                    //to = "gpsrca@pk.ibm.com";
+                    to = "gsupport@pk.ibm.com";
+                }
+               /* if (cc == null && StringUtils.isNotBlank(contractRequest.getRequestedBy())) {
+                    cc = contractRequest.getRequestedBy();
+                }*/
+                recipients.add(to);
+                ccList.add(cc);
+
+                if (StringUtils.isNotBlank(contractRequest.getRequestedBy())) {
+                    ccList.add(cc);
+                }
+
+                gPSMailer.sendEmail(emailTemplate.getFromAlias(), subject, body, recipients, ccList);
+            }
+        } catch (Exception e) {
+            log.error(e.getMessage(), e);
+        }
+        log.debug(templateName + ": notifaction sent to users.");
+    }
+
+    private String getToEmail(String whom, ContractRequest contractRequest) {
+        String to = whom;
+        if (to == null || to.isEmpty()) {
+            //
+        } else if (to.trim().equalsIgnoreCase("submitter")) {
+            log.trace("fetching submitter");
+            to = contractRequest.getRequestedBy();
+        } else if (to.trim().equalsIgnoreCase("towerLead")) {
+            log.trace("fetching towerLead");
+            to = contractRequest.getTowerLeadId();
+        } else if (to.trim().equalsIgnoreCase("Application Owner")) {
+            to = ConstantDataManager.APPLICATION_OWNER;
+        } else if (to.trim().equalsIgnoreCase("Support Team")) {
+            //to = "gpsrca@pk.ibm.com";
+            to = "gsupport@pk.ibm.com";
+
+        }
+        return to;
+    }
+
+    /**
+     * @param contractRequest
+     * @return
+     */
+    private Hashtable<String, String> getValueMap(ContractRequest contractRequest) {
+//		String action = "";
+//		if(Constant.ACCESS_REQUEST.equals(contractRequest.getRequestType())){
+//			action = "accessRequest.htm";
+//		} else if(Constant.NEW_CONTRACT_REQUEST.equals(contractRequest.getRequestType())){
+//			action = "newContract.htm";
+//		} else if(Constant.MOD_CONTRACT_REQUEST.equals(contractRequest.getRequestType())){
+//			action = "modifyContract.htm";
+//		}
+        Hashtable<String, String> keys = new Hashtable<String, String>();
+        if (contractRequest.getContractName() != null) {
+            keys.put("contractName", contractRequest.getContractName());
+        }
+        keys.put("requestId", "" + contractRequest.getRequestId());
+        if (contractRequest.getRequestedBy() != null) {
+            keys.put("submitter", contractRequest.getRequestedBy());
+        }
+        if (contractRequest.getTowerLeadId() != null) {
+            keys.put("towerLead", contractRequest.getTowerLeadId());
+        }
+//		keys.put("action", action);
+
+        return keys;
+    }
+
+    /**
+     * @param contractRequest
+     * @throws GPSException
+     */
+    private void approveContractRequest(ContractRequest contractRequest) throws GPSException {
+        log.debug("update contract request..." + contractRequest.getContractName());
+        ContractRequest tempContractRequest = null;
+        if (contractRequest.getRequestId() != null) {
+            tempContractRequest = contractRequestDao.getContractRequestById(contractRequest.getRequestId());
+            contractRequest.setStatus("2");
+            tempContractRequest.setActionDate(new Date());
+            tempContractRequest.setStatus(contractRequest.getStatus());
+            tempContractRequest.setRejectionComments(contractRequest.getRejectionComments());
+            tempContractRequest.setAccessRequestType(contractRequest.getAccessRequestType());
+            log.debug("status = " + contractRequest.getStatus());
+
+            tempContractRequest.setProfileApprovedLevel(contractRequest.getProfileApprovedLevel());
+            tempContractRequest.setProfileActiveLevel(contractRequest.getProfileActiveLevel());
+
+            contractRequestDao.updateContractRequest(tempContractRequest);
+            log.debug("successfully updated contract request.");
+
+            String templateName = "";
+            if (Constant.APPROVED_STATE.equals(contractRequest.getStatus())) {
+                if (Constant.ACCESS_REQUEST.equals(contractRequest.getRequestType())) {
+                    templateName = "APPROVE_RCA_ACCESS_REQUEST";
+                    // sendNotification(templateName, tempContractRequest);
+                    sendRcaAccessRequestApproved(contractRequest);
+                } else if (Constant.NEW_CONTRACT_REQUEST.equals(contractRequest.getRequestType())) {
+                    templateName = "APPROVE_ADD_NEW_ACCOUNT_REQUEST";
+                    sendNotification(templateName, tempContractRequest);
+                } else if (Constant.MOD_CONTRACT_REQUEST.equals(contractRequest.getRequestType())) {
+                    templateName = "APPROVE_MODIFY_EXISTING_ACCOUNT_REQUEST";
+                    sendNotification(templateName, tempContractRequest);
+                } else if (Constant.REMOVE_ACCESS_REQUEST.equals(contractRequest.getRequestType())) {
+                    templateName = "APPROVE_REMOVE_ACCESS_REQUEST";
+                    sendNotification(templateName, tempContractRequest);
+                }
+            }
+
+
+        }
+    }
+
+    private void rejectContractRequest(ContractRequest contractRequest) throws GPSException {
+        log.debug("update contract request..." + contractRequest.getContractName());
+        ContractRequest tempContractRequest = null;
+        if (contractRequest.getRequestId() != null) {
+            contractRequest.setStatus("8");
+            tempContractRequest = contractRequestDao.getContractRequestById(contractRequest.getRequestId());
+            tempContractRequest.setActionDate(new Date());
+            tempContractRequest.setStatus(contractRequest.getStatus());
+            tempContractRequest.setRejectionComments(contractRequest.getRejectionComments());
+            tempContractRequest.setAccessRequestType(contractRequest.getAccessRequestType());
+            log.debug("status = " + contractRequest.getStatus());
+
+            tempContractRequest.setProfileApprovedLevel(contractRequest.getProfileApprovedLevel());
+
+            tempContractRequest.setProfileActiveLevel(contractRequest.getProfileActiveLevel());
+
+            contractRequestDao.updateContractRequest(tempContractRequest);
+            log.debug("successfully updated contract request.");
+
+            String templateName = "";
+            if (Constant.REJECTED_STATE.equals(contractRequest.getStatus())) {
+                if (Constant.ACCESS_REQUEST.equals(contractRequest.getRequestType())) {
+                    templateName = "REJECT_RCA_ACCESS_REQUEST";
+                } else if (Constant.NEW_CONTRACT_REQUEST.equals(contractRequest.getRequestType())) {
+                    templateName = "REJECT_ADD_NEW_ACCOUNT_REQUEST";
+                } else if (Constant.MOD_CONTRACT_REQUEST.equals(contractRequest.getRequestType())) {
+                    templateName = "REJECT_MODIFY_EXISTING_ACCOUNT_REQUEST";
+                } else if (Constant.REMOVE_ACCESS_REQUEST.equals(contractRequest.getRequestType())) {
+                    templateName = "REJECT_REMOVE_ACCESS_REQUEST";
+                }
+            }
+            sendRejectionNotification(tempContractRequest);
+        }
+    }
+
+    private void sendRejectionNotification(ContractRequest contractRequest) {
+        try {
+            Boolean isNotification = Boolean.parseBoolean(supportNotifications);
+            if (!isNotification) {
+                return;
+            }
+            EmailTemplate emailTemplate = emailTemplateDao.getEmailTemplateByName("RCA_ACCESS_REQUEST_REJECTION");
+            Hashtable<String, String> keys = getValueMap(contractRequest);
+            if (emailTemplate != null) {
+                String to = getToEmail(emailTemplate.getToEmail(), contractRequest);
+                String body = com.gps.util.StringUtils.replaceAll(emailTemplate.getBody(), keys);
+                String subject = com.gps.util.StringUtils.replaceAll(emailTemplate.getSubject(), keys);
+                String cc = getToEmail(emailTemplate.getCcEmail(), contractRequest);
+                String bcc = getToEmail(emailTemplate.getBccEmail(), contractRequest);
+                List<String> recipients = new ArrayList<String>();
+                List<String> ccList = new ArrayList<String>();
+
+                recipients.add(to);
+                // ccList.add(cc);
+                gPSMailer.sendEmail(emailTemplate.getFromAlias(), subject, body, recipients, ccList);
+            }
+        } catch (Exception e) {
+            log.error(e.getMessage(), e);
+        }
+
+    }
+
+
+}

@@ -1,0 +1,61 @@
+/**<pre> 
+ *==========================================================================
+ *
+ * Copyright: (C) IBM Corporation 2013 -- IBM Internal Use Only
+ *
+ *==========================================================================
+ *
+ *    FILE: GroupUserDaoImpl.java
+ *    CREATOR:Waqar Malik
+ *    DEPT: GBS PAK
+ *    DATE: 16/09/2013
+ *
+ *-PURPOSE-----------------------------------------------------------------
+ * 
+ *--------------------------------------------------------------------------
+ *
+ *
+ *-CHANGE LOG--------------------------------------------------------------
+ * 16/09/2013Waqar Malik Initial coding.
+ *==========================================================================
+ * </pre> */
+
+package com.gps.dao.impl;
+
+import com.gps.dao.GroupGpsuserDao;
+import com.gps.exceptions.GPSException;
+import com.gps.vo.GroupGpsuser;
+import org.springframework.stereotype.Repository;
+
+import javax.persistence.EntityManager;
+import javax.persistence.PersistenceContext;
+import java.util.List;
+
+/**
+ * This class provides implementation for GpsUserDao.
+ *  
+ * @authorWaqar Malik
+ */
+@Repository
+public class GroupGpsuserDaoImpl implements GroupGpsuserDao {
+	
+	@PersistenceContext
+	private EntityManager entityManager;
+
+	@Override
+	public void addGroupGpsuser(GroupGpsuser GroupGpsuser) throws GPSException {
+		try {
+			entityManager.persist(GroupGpsuser);
+		}
+		catch(Exception e){
+			throw new GPSException(e.getMessage(), e);
+		}
+	}
+	
+	@Override
+	public void addGroupGpsuser(List<GroupGpsuser> listGroupGpsuser) throws GPSException {
+		for(GroupGpsuser GroupGpsuser : listGroupGpsuser){
+			addGroupGpsuser(GroupGpsuser);
+		}
+	}
+}

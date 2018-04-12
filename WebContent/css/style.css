@@ -1,0 +1,179 @@
+.loignbox_bg {
+    background-color: #FFFFFF;
+}
+.bar-green-dark {
+    background: #7a3;
+    color: #fff;
+    padding: .3em .5em;
+    font-size: 1.1em;
+    font-weight: bold;
+}
+
+.bar-green-med-dark {
+    background: #9c3;
+    color: #fff;
+    padding: .3em .5em;
+    font-size: 1.1em;
+    font-weight: bold;
+}
+
+.bar-green-med-dark_cell {
+    background: #9c3;
+    color: #fff;
+    margin: 2px 2px 2px 2px;
+    padding: 2px 2px 2px 2px;
+    font-size: 1.1em;
+    font-weight: bold;
+}
+
+.bar-green-med-light {
+    background: #bd6;
+    color: #000;
+    padding: .3em .5em;
+    font-size: 1.1em;
+    font-weight: bold;
+}
+
+.bar-blue-med-dark {
+    background: #47b;
+    color: #fff;
+    padding: .3em .5em;
+    font-size: 1.1em;
+    font-weight: bold;
+}
+
+.bar-blue-med {
+    background: #69c;
+    color: #fff;
+    padding: .3em .5em;
+    font-size: 1.1em;
+    font-weight: bold;
+}
+
+.bar-blue-med-light {
+    background: #9be;
+    color: #fff;
+    padding: .2em .2em;
+    font-size: 1.0em;
+    font-weight: bold;
+}
+
+.bar-gray-dark {
+    background: #666;
+    color: #fff;
+    padding: .3em .5em;
+    font-size: 1.1em;
+    font-weight: bold;
+}
+
+.bar-gray-med-dark {
+    background: #999;
+    color: #fff;
+    padding: .3em .5em;
+    font-size: 1.1em;
+    font-weight: bold;
+}
+
+.bar-gray-med-light {
+    background: #ccc;
+    color: #000;
+    padding: .3em .5em;
+    font-size: 1.1em;
+    font-weight: bold;
+}
+
+.bar-gray-light {
+    background: #ddd;
+    color: #000;
+    padding: .3em .5em;
+    font-size: 1.1em;
+    font-weight: bold;
+}
+
+.bar-blue-black {
+    background: #003f69;
+    color: #fff;
+    padding: .3em .5em;
+    font-size: 1.1em;
+    font-weight: bold;
+}
+
+.bar-green-black {
+    background: #00a6a0;
+    color: #fff;
+    padding: .3em .5em;
+    font-size: 1.1em;
+    font-weight: bold;
+}
+
+.bar-green-black-small {
+    background: #00a6a0;
+    color: #fff;
+    padding: .2em .2em;
+    font-size: 1.0em;
+    font-weight: bold;
+}
+
+.lr-mar-10px {
+    margin-left: 10px;
+    margin-right: 10px;
+    margin-top: 10px;
+    margin-bottom: 10px;
+}
+
+.dot-bor-1px {
+    border: 2px dotted #CCC
+}
+
+.sol-bor-1px {
+    border: 1px solid #CCC
+}
+
+.contract-contact-info {
+    width: 180px
+}
+
+.errors {
+    color: #ff0000;
+    font-style: italic;
+}
+.custom-date-style {
+    background-color: red !important;
+}
+
+#general_Information span {
+    display: block;
+    height: 25px;
+}
+
+#general_Information label {
+    width: auto;
+    width: 250px;
+    font-weight: normal;
+}
+
+#general_Information tr {
+    height: 25px;
+}
+
+#bcrs span {
+    display: block;
+    height: 30px;
+}
+
+#bcrs label {
+    width: auto;
+    width: 550px;
+    font-weight: normal;
+}
+
+#csst span {
+    display: block;
+    height: 30px;
+}
+
+#csst label {
+    width: auto;
+    width: 550px;
+    font-weight: normal;
+}
